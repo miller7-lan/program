@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+build/
+dist/
+*.spec
+
+# Database
+family_ledger.db
+
+# OS
+.DS_Store
+Thumbs.db

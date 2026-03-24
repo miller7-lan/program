@@ -1,0 +1,38 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --noconsole --onefile --name "利润助手" main.py
+
+    - name: Create Zip Archive
+      run: |
+         powershell Compress-Archive -Path "dist\利润助手.exe" -DestinationPath "利润助手_Windows_v1.0.zip"
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: BusinessHelper_Windows
+        path: 利润助手_Windows_v1.0.zip

@@ -1,0 +1,330 @@
+/* ─────────────────────────────────────────────────────────
+   assets/style.qss  —  利润助手 全局样式表
+   白色简洁主题，清爽现代
+───────────────────────────────────────────────────────── */
+
+/* ──── 全局 ──── */
+QMainWindow, QWidget, QFrame {
+    background-color: #F5F6FA;
+    color: #1A1A2E;
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 14px;
+}
+
+/* ──── 侧边栏 ──── */
+#Sidebar {
+    background-color: #FFFFFF;
+}
+
+#TitleArea {
+    background-color: #FFFFFF;
+    padding-left: 20px;
+}
+
+#AppTitle {
+    color: #6C5CE7;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+#VersionLabel {
+    color: #BABACF;
+    font-size: 11px;
+}
+
+#Separator {
+    background-color: #E8E8F0;
+}
+
+/* ──── 导航按钮 ──── */
+#NavButton {
+    text-align: left;
+    padding-left: 26px;
+    color: #7A7A9D;
+    background: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+    border-radius: 0px;
+    font-size: 14px;
+}
+
+#NavButton:hover {
+    background-color: #F0EEFF;
+    color: #3D3D5C;
+}
+
+#NavButton:checked {
+    color: #6C5CE7;
+    border-left: 3px solid #6C5CE7;
+    background-color: #EDE9FF;
+    font-weight: 600;
+}
+
+/* ──── 页面标题 ──── */
+#PageTitle {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1A1A2E;
+    margin-bottom: 4px;
+}
+
+#SectionLabel {
+    font-size: 15px;
+    font-weight: 600;
+    color: #3D3D5C;
+}
+
+#HintLabel {
+    font-size: 12px;
+    color: #9999BB;
+    line-height: 1.5;
+}
+
+/* ──── 看板卡片 ──── */
+#DashCard {
+    background-color: #FFFFFF;
+    border: 1px solid #E8E8F0;
+    border-radius: 12px;
+    padding: 8px;
+    min-height: 90px;
+}
+
+#CardLabel {
+    color: #9999BB;
+    font-size: 12px;
+}
+
+#CardValue {
+    color: #6C5CE7;
+    font-size: 26px;
+    font-weight: 700;
+}
+
+/* ──── 图表占位区 ──── */
+#ChartPlaceholder {
+    background-color: #FFFFFF;
+    border: 1px dashed #D0D0E8;
+    border-radius: 12px;
+}
+
+#PlaceholderLabel {
+    color: #C0C0D8;
+    font-size: 15px;
+}
+
+/* ──── 输入框 ──── */
+#FieldInput, QLineEdit {
+    background-color: #FFFFFF;
+    border: 1px solid #D8D8EC;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #1A1A2E;
+    min-height: 20px;
+    selection-background-color: #C5BDFF;
+}
+
+#FieldInput:focus, QLineEdit:focus {
+    border: 1px solid #6C5CE7;
+    background-color: #FAFAFF;
+}
+
+#FieldInput::placeholder, QLineEdit::placeholder {
+    color: #C0C0D8;
+}
+
+/* ──── 日期选择 ──── */
+#DateEdit, QDateEdit {
+    background-color: #FFFFFF;
+    border: 1px solid #D8D8EC;
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: #1A1A2E;
+    min-width: 120px;
+}
+
+QDateEdit::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: 28px;
+    border: none;
+}
+
+QCalendarWidget {
+    background-color: #FFFFFF;
+    color: #1A1A2E;
+}
+
+/* ──── 按钮 ──── */
+#PrimaryButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #6C5CE7, stop:1 #A29BFE);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+#PrimaryButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #7D6EF0, stop:1 #B3ACFF);
+}
+
+#PrimaryButton:pressed {
+    background: #5A4BD0;
+}
+
+#SecondaryButton {
+    background-color: #F0EEFF;
+    color: #6C5CE7;
+    border: 1px solid #D0CAFF;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+}
+
+#SecondaryButton:hover {
+    background-color: #E4E0FF;
+    color: #5040D0;
+    border-color: #A89EFF;
+}
+
+#DangerButton {
+    background-color: #FFF0F0;
+    color: #E05050;
+    border: 1px solid #FFCCCC;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+}
+
+#DangerButton:hover {
+    background-color: #FFE4E4;
+    color: #CC3030;
+}
+
+/* ──── 表格 ──── */
+#HistoryTable, QTableWidget {
+    background-color: #FFFFFF;
+    alternate-background-color: #F8F8FF;
+    border: 1px solid #E8E8F0;
+    border-radius: 8px;
+    gridline-color: #EDEDF5;
+    color: #1A1A2E;
+}
+
+QTableWidget QHeaderView::section {
+    background-color: #F5F6FA;
+    color: #7A7A9D;
+    font-weight: 600;
+    border: none;
+    border-bottom: 1px solid #E0E0EE;
+    padding: 8px;
+}
+
+QTableWidget::item:selected {
+    background-color: #EDE9FF;
+    color: #3D3D5C;
+}
+
+/* ──── 字段列表 ──── */
+#FieldList, QListWidget {
+    background-color: #FFFFFF;
+    border: 1px solid #E8E8F0;
+    border-radius: 8px;
+    color: #1A1A2E;
+    padding: 4px;
+}
+
+QListWidget::item {
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+
+QListWidget::item:selected {
+    background-color: #EDE9FF;
+    color: #3D3D5C;
+}
+
+QListWidget::item:hover {
+    background-color: #F4F2FF;
+}
+
+/* ──── 字段容器 ──── */
+#FieldsFrame, #CalcFrame {
+    background-color: #FFFFFF;
+    border: 1px solid #E8E8F0;
+    border-radius: 12px;
+}
+
+/* ──── 公式辅助按钮 ──── */
+#CalcButton {
+    background-color: #F0F0F8;
+    color: #4A4A6A;
+    border: 1px solid #D0D0E8;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+#CalcButton:hover {
+    background-color: #E8E8F0;
+    border-color: #BABACC;
+}
+
+#FieldCalcButton {
+    background-color: #EDE9FF;
+    color: #6C5CE7;
+    border: 1px solid #D0CAFF;
+    border-radius: 6px;
+    padding: 0px 12px;
+    font-weight: 600;
+}
+
+#FieldCalcButton:hover {
+    background-color: #E4E0FF;
+    color: #5040D0;
+}
+
+/* ──── 滚动条 ──── */
+QScrollBar:vertical {
+    background: #F5F6FA;
+    width: 8px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical {
+    background: #D0D0E8;
+    border-radius: 4px;
+    min-height: 20px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #A0A0C8;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* ──── 消息框 ──── */
+QMessageBox {
+    background-color: #FFFFFF;
+    color: #1A1A2E;
+}
+
+QMessageBox QPushButton {
+    background-color: #F0EEFF;
+    color: #6C5CE7;
+    border: 1px solid #D0CAFF;
+    border-radius: 6px;
+    padding: 6px 16px;
+    min-width: 72px;
+}
+
+QMessageBox QPushButton:hover {
+    background-color: #E4E0FF;
+    color: #5040D0;
+}
