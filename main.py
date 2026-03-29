@@ -17,7 +17,9 @@ main.py — 利润助手程序入口
 """
 
 import sys
+from pathlib import Path
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 
@@ -34,6 +36,9 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("利润助手")
     app.setOrganizationName("HomeApp")
+    icon_path = Path(__file__).resolve().parent / "assets" / "app_icon.png"
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
 
     # 初始化数据库（第一次运行时自动建表写入默认配置）
     db = DatabaseManager()

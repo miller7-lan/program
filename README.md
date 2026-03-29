@@ -32,7 +32,10 @@
 │   ├── history_view.py  # 历史记录页
 │   └── settings_view.py # 设置页
 └── assets/
-    └── style.qss        # 深色主题样式表
+    ├── style.qss        # 深色主题样式表
+    ├── app_icon.png     # 运行时应用图标
+    ├── app_icon.ico     # Windows 打包图标
+    └── app_icon.icns    # macOS 打包图标
 ```
 
 ## 快速开始（Mac 开发环境）
@@ -59,10 +62,22 @@ python main.py
 ```bash
 # 在 Windows 机器上：
 pip install pyinstaller
-pyinstaller --noconsole --onefile main.py
+pyinstaller --noconsole --onefile ^
+  --icon assets/app_icon.ico ^
+  --add-data "assets;assets" ^
+  main.py
 ```
 
 生成的 `.exe` 位于 `dist/main.exe`，可直接复制到目标电脑运行，无需安装 Python。
+
+如果在 macOS 打包 `.app`，可使用：
+
+```bash
+pyinstaller --windowed --onedir \
+  --icon assets/app_icon.icns \
+  --add-data "assets:assets" \
+  main.py
+```
 
 ## 数据说明
 

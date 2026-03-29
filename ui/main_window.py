@@ -71,8 +71,9 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self._db = db
         self.setWindowTitle("利润助手")
-        self.setMinimumSize(960, 640)
-        self.resize(1100, 700)
+        self.setMinimumSize(1260, 860)
+        self.resize(1440, 960)
+        self._apply_app_icon()
 
         self._build_ui()
         self._apply_styles()
@@ -80,6 +81,18 @@ class MainWindow(QMainWindow):
         # 默认选中第一个导航项
         self._nav_buttons[0].setChecked(True)
         self._stack.setCurrentIndex(0)
+
+    # ─────────────────────────────────────
+    # 图标
+    # ─────────────────────────────────────
+
+    def _apply_app_icon(self) -> None:
+        """加载应用图标，用于窗口标题栏和任务栏。"""
+        from pathlib import Path
+
+        icon_path = Path(__file__).resolve().parent.parent / "assets" / "app_icon.png"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
 
     # ─────────────────────────────────────
     # UI 构建
@@ -96,7 +109,7 @@ class MainWindow(QMainWindow):
         # ── 左侧导航栏 ──────────────────────
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(210)
+        sidebar.setFixedWidth(240)
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
@@ -104,7 +117,7 @@ class MainWindow(QMainWindow):
         # App 标题区域
         title_area = QFrame()
         title_area.setObjectName("TitleArea")
-        title_area.setFixedHeight(72)
+        title_area.setFixedHeight(86)
         title_layout = QHBoxLayout(title_area)
         app_title = QLabel("💰 利润助手")
         app_title.setObjectName("AppTitle")

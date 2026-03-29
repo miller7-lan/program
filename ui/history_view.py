@@ -9,32 +9,30 @@ ui/history_view.py
   - 监听 event_bus.data_changed → 自动刷新表格
 """
 
-from PySide6.QtCore import QDate, Qt, QThread, Signal
+from PySide6.QtCore import QDate, QThread, Signal
 from PySide6.QtWidgets import (
     QDateEdit,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
-    QMessageBox,
-    QFileDialog,
 )
 
 from core.event_bus import event_bus
+from core.field_config import summarize_raw_data
 
 
-
-# ──────────────────────────────────────────────────────────────
-# 导出后台线程
-# ──────────────────────────────────────────────────────────────
 class ExportWorker(QThread):
     """负责在后台执行导出操作，避免主界面卡死。"""
-    finished = Signal(str)  # 成功信号，传出物理路径
-    error = Signal(str)     # 失败信号
+
+    finished = Signal(str)
+    error = Signal(str)
 
     def __init__(self, db, start, end, path):
         super().__init__()
@@ -45,10 +43,13 @@ class ExportWorker(QThread):
 
     def run(self):
         from core.report_engine import ReportEngine
+
         try:
             engine = ReportEngine(self.db)
             exported_path = engine.export_to_excel(
-                self.export_path, self.start_date, self.end_date
+                self.export_path,
+                self.start_date,
+                self.end_date,
             )
             self.finished.emit(str(exported_path))
         except Exception as e:
@@ -64,21 +65,15 @@ class HistoryView(QWidget):
         self._build_ui()
         event_bus.data_changed.connect(self.refresh)
 
-    # ─────────────────────────────────────
-    # UI 构建
-    # ─────────────────────────────────────
-
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(32, 28, 32, 28)
         layout.setSpacing(16)
 
-        # 页面标题
         title = QLabel("📋 历史记录")
         title.setObjectName("PageTitle")
         layout.addWidget(title)
 
-        # ── 日期筛选行 ────────────────────────
         filter_row = QHBoxLayout()
         filter_row.setSpacing(10)
 
@@ -103,7 +98,6 @@ class HistoryView(QWidget):
         filter_row.addStretch()
         layout.addLayout(filter_row)
 
-        # ── 数据表格 ──────────────────────────
         self._table = QTableWidget()
         self._table.setObjectName("HistoryTable")
         self._table.setColumnCount(3)
@@ -114,7 +108,6 @@ class HistoryView(QWidget):
         self._table.setAlternatingRowColors(True)
         layout.addWidget(self._table)
 
-        # ── 底部操作按钮 ──────────────────────
         action_row = QHBoxLayout()
         action_row.addStretch()
 
@@ -129,12 +122,7 @@ class HistoryView(QWidget):
         action_row.addWidget(export_btn)
         layout.addLayout(action_row)
 
-    # ─────────────────────────────────────
-    # 数据操作
-    # ─────────────────────────────────────
-
     def refresh(self) -> None:
-        """根据日期范围筛选条件重新加载表格数据。"""
         start = self._start_date.date().toString("yyyy-MM-dd")
         end = self._end_date.date().toString("yyyy-MM-dd")
         records = self._db.get_range(start, end)
@@ -142,27 +130,24 @@ class HistoryView(QWidget):
         self._table.setRowCount(len(records))
         for row_idx, rec in enumerate(records):
             self._table.setItem(row_idx, 0, QTableWidgetItem(rec["date"]))
-            self._table.setItem(
-                row_idx, 1, QTableWidgetItem(f"{rec['total_profit']:.2f}")
-            )
-            # 原始数据摘要（显示前3个字段）
-            summary_parts = [f"{k}: {v}" for k, v in list(rec["raw_data"].items())[:3]]
-            summary = "  |  ".join(summary_parts)
-            self._table.setItem(row_idx, 2, QTableWidgetItem(summary))
+            self._table.setItem(row_idx, 1, QTableWidgetItem(f"{rec['total_profit']:.2f}"))
+            self._table.setItem(row_idx, 2, QTableWidgetItem(summarize_raw_data(rec["raw_data"])))
 
     def _on_delete(self) -> None:
-        """删除当前选中行对应的数据库记录。"""
         selected = self._table.selectedItems()
         if not selected:
             QMessageBox.information(self, "提示", "请先选中要删除的行。")
             return
+
         row = self._table.currentRow()
         date_item = self._table.item(row, 0)
         if not date_item:
             return
+
         date_str = date_item.text()
         reply = QMessageBox.question(
-            self, "确认删除",
+            self,
+            "确认删除",
             f"确定要删除 {date_str} 的记录吗？此操作不可恢复。",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -171,12 +156,13 @@ class HistoryView(QWidget):
             event_bus.data_changed.emit()
 
     def _on_export(self) -> None:
-        """异步导出当前筛选范围的数据为 Excel 文件。"""
         from pathlib import Path
 
         save_path, _ = QFileDialog.getSaveFileName(
-            self, "导出 Excel", str(Path.home() / "利润报表.xlsx"),
-            "Excel 文件 (*.xlsx)"
+            self,
+            "导出 Excel",
+            str(Path.home() / "利润报表.xlsx"),
+            "Excel 文件 (*.xlsx)",
         )
         if not save_path:
             return
@@ -184,16 +170,13 @@ class HistoryView(QWidget):
         start = self._start_date.date().toString("yyyy-MM-dd")
         end = self._end_date.date().toString("yyyy-MM-dd")
 
-        # 禁用导出按钮防止重复点击
         sender = self.sender()
         if isinstance(sender, QPushButton):
             sender.setEnabled(False)
             sender.setText("⌛ 导出中...")
 
-        # 创建并启动后台线程
         self._export_thread = ExportWorker(self._db, start, end, save_path)
-        
-        # 定义回调
+
         def on_finished(path):
             if isinstance(sender, QPushButton):
                 sender.setEnabled(True)

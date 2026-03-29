@@ -8,7 +8,7 @@ QMainWindow, QWidget, QFrame {
     background-color: #F5F6FA;
     color: #1A1A2E;
     font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
-    font-size: 14px;
+    font-size: 15px;
 }
 
 /* ──── 侧边栏 ──── */
@@ -18,12 +18,12 @@ QMainWindow, QWidget, QFrame {
 
 #TitleArea {
     background-color: #FFFFFF;
-    padding-left: 20px;
+    padding-left: 24px;
 }
 
 #AppTitle {
     color: #6C5CE7;
-    font-size: 17px;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: 1px;
 }
@@ -40,13 +40,13 @@ QMainWindow, QWidget, QFrame {
 /* ──── 导航按钮 ──── */
 #NavButton {
     text-align: left;
-    padding-left: 26px;
+    padding-left: 30px;
     color: #7A7A9D;
     background: transparent;
     border: none;
     border-left: 3px solid transparent;
     border-radius: 0px;
-    font-size: 14px;
+    font-size: 17px;
 }
 
 #NavButton:hover {
@@ -63,20 +63,20 @@ QMainWindow, QWidget, QFrame {
 
 /* ──── 页面标题 ──── */
 #PageTitle {
-    font-size: 22px;
+    font-size: 32px;
     font-weight: 700;
     color: #1A1A2E;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 #SectionLabel {
-    font-size: 15px;
+    font-size: 22px;
     font-weight: 600;
     color: #3D3D5C;
 }
 
 #HintLabel {
-    font-size: 12px;
+    font-size: 15px;
     color: #9999BB;
     line-height: 1.5;
 }
@@ -117,11 +117,12 @@ QMainWindow, QWidget, QFrame {
 #FieldInput, QLineEdit {
     background-color: #FFFFFF;
     border: 1px solid #D8D8EC;
-    border-radius: 8px;
-    padding: 8px 12px;
+    border-radius: 12px;
+    padding: 12px 16px;
     color: #1A1A2E;
-    min-height: 20px;
+    min-height: 28px;
     selection-background-color: #C5BDFF;
+    font-size: 16px;
 }
 
 #FieldInput:focus, QLineEdit:focus {
@@ -137,10 +138,12 @@ QMainWindow, QWidget, QFrame {
 #DateEdit, QDateEdit {
     background-color: #FFFFFF;
     border: 1px solid #D8D8EC;
-    border-radius: 8px;
-    padding: 6px 10px;
+    border-radius: 12px;
+    padding: 10px 14px;
     color: #1A1A2E;
-    min-width: 120px;
+    min-width: 180px;
+    min-height: 28px;
+    font-size: 16px;
 }
 
 QDateEdit::drop-down {
@@ -161,10 +164,10 @@ QCalendarWidget {
         stop:0 #6C5CE7, stop:1 #A29BFE);
     color: #FFFFFF;
     border: none;
-    border-radius: 10px;
-    padding: 10px 24px;
+    border-radius: 14px;
+    padding: 14px 28px;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 17px;
 }
 
 #PrimaryButton:hover {
@@ -180,9 +183,9 @@ QCalendarWidget {
     background-color: #F0EEFF;
     color: #6C5CE7;
     border: 1px solid #D0CAFF;
-    border-radius: 8px;
-    padding: 8px 18px;
-    font-size: 13px;
+    border-radius: 12px;
+    padding: 11px 20px;
+    font-size: 15px;
 }
 
 #SecondaryButton:hover {
@@ -195,9 +198,9 @@ QCalendarWidget {
     background-color: #FFF0F0;
     color: #E05050;
     border: 1px solid #FFCCCC;
-    border-radius: 8px;
-    padding: 8px 18px;
-    font-size: 13px;
+    border-radius: 12px;
+    padding: 11px 20px;
+    font-size: 15px;
 }
 
 #DangerButton:hover {
@@ -256,7 +259,152 @@ QListWidget::item:hover {
 #FieldsFrame, #CalcFrame {
     background-color: #FFFFFF;
     border: 1px solid #E8E8F0;
+    border-radius: 18px;
+}
+
+#PageScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+#MindMapBoard, #EntryScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
+#BranchCard, #EntryCategoryCard {
+    background-color: #FFFFFF;
+    border: 1px solid #E8E8F0;
+    border-radius: 20px;
+}
+
+#BranchNodeButton {
+    background-color: #EDE9FF;
+    color: #4C3FD1;
+    border: 1px solid #D6CFFF;
+    border-radius: 20px;
+    padding: 12px 22px;
+    font-weight: 700;
+    font-size: 17px;
+}
+
+#BranchNodeButton:hover, #BranchNodeButton:checked {
+    background-color: #DCD4FF;
+    border-color: #A89EFF;
+}
+
+#BranchChildButton {
+    background-color: #F8F6FF;
+    color: #5E56A6;
+    border: 1px solid #E1DCF8;
+    border-radius: 18px;
+    padding: 10px 18px;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+#BranchChildButton:hover, #BranchChildButton:checked {
+    background-color: #EEE9FF;
+    border-color: #BDB1FF;
+}
+
+#BranchLineLabel, #EntryBranchLabel {
+    color: #B7B0D8;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+#BranchMetaLabel {
+    color: #8E86C8;
+    background-color: #F6F4FF;
+    border: 1px solid #E6E1FF;
+    border-radius: 14px;
+    padding: 6px 12px;
+    font-size: 14px;
+}
+
+#FormulaFieldCard {
+    background-color: #FAFAFF;
+    border: 1px solid #E3E0F7;
+    border-radius: 16px;
+}
+
+#FormulaGroupTitle {
+    color: #3E3B63;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#FormulaStateLabel {
+    color: #7E76B5;
+    background-color: #F1EEFF;
+    border: 1px solid #DDD7FF;
     border-radius: 12px;
+    padding: 5px 10px;
+    font-size: 13px;
+}
+
+#FormulaChildSummary {
+    color: #5A5678;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+#FormulaChildButton {
+    background-color: #FFFFFF;
+    color: #62599A;
+    border: 1px solid #DDD7FF;
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+#FormulaChildButton:hover {
+    background-color: #F2EFFF;
+    border-color: #BDB1FF;
+    color: #4C3FD1;
+}
+
+#FormulaDirectButton {
+    background-color: #EDE9FF;
+    color: #5A49C8;
+    border: 1px solid #D0CAFF;
+    border-radius: 12px;
+    padding: 10px 18px;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+#FormulaDirectButton:hover {
+    background-color: #E4E0FF;
+    border-color: #BEB5FF;
+}
+
+#SelectedHint {
+    color: #645D89;
+    background-color: #F7F5FF;
+    border: 1px solid #E4DFFF;
+    border-radius: 14px;
+    padding: 14px 18px;
+    font-size: 16px;
+}
+
+#EntryCategoryTitle {
+    font-size: 22px;
+    font-weight: 700;
+    color: #2E3152;
+}
+
+#EntryNodeDot {
+    color: #6C5CE7;
+    font-size: 20px;
+}
+
+#EntryFieldLabel {
+    color: #54546D;
+    font-weight: 600;
+    font-size: 16px;
 }
 
 /* ──── 公式辅助按钮 ──── */
