@@ -1,0 +1,22 @@
+
+
+[漂移追加 — 2026-04-13 08:20:14]
+# 以下包已安装但未在 requirements.txt 中声明
+  altgraph
+  contourpy
+  cycler
+  et-xmlfile
+  fonttools
+  kiwisolver
+  macholib
+  numpy
+  packaging
+  pillow
+  pyinstaller
+  pyinstaller-hooks-contrib
+  pyparsing
+  pyside6-addons
+  pyside6-essentials
+  python-dateutil
+  shiboken6
+  six

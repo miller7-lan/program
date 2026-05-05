@@ -81,7 +81,9 @@ class ReportEngine:
         grouped_records = self._group_records(records)
 
         for year, months in grouped_records:
-            year_profit = sum(record["total_profit"] for _, month_records in months for record in month_records)
+            year_profit = self._sum_profit(
+                record for _, month_records in months for record in month_records
+            )
             sheet.cell(row=current_row, column=1, value=f"【年度标注】{year} 年")
             sheet.cell(row=current_row, column=7, value="年利润（元）")
             sheet.cell(row=current_row, column=8, value=round(year_profit, 2))
@@ -89,7 +91,7 @@ class ReportEngine:
             current_row += 1
 
             for month, month_records in months:
-                month_profit = sum(record["total_profit"] for record in month_records)
+                month_profit = self._sum_profit(month_records)
                 sheet.cell(row=current_row, column=1, value=f"【月份标注】{year} 年 {month:02d} 月")
                 sheet.cell(row=current_row, column=7, value="月利润（元）")
                 sheet.cell(row=current_row, column=8, value=round(month_profit, 2))
@@ -121,11 +123,11 @@ class ReportEngine:
 
         month_start = now.replace(day=1).strftime("%Y-%m-%d")
         month_records = self._db.get_range(month_start, today_str)
-        month_val = sum(r["total_profit"] for r in month_records)
+        month_val = self._sum_profit(month_records)
 
         year_start = now.replace(month=1, day=1).strftime("%Y-%m-%d")
         year_records = self._db.get_range(year_start, today_str)
-        year_val = sum(r["total_profit"] for r in year_records)
+        year_val = self._sum_profit(year_records)
 
         return {
             "today": today_val,
@@ -196,7 +198,7 @@ class ReportEngine:
 
         sheet.cell(row=start_row, column=1, value=record["date"])
         sheet.cell(row=start_row, column=6, value=round(record["total_profit"], 2))
-        sheet.cell(row=start_row, column=8, value="当日记录")
+        sheet.cell(row=start_row, column=8, value=record.get("note", ""))
         if end_row > start_row:
             sheet.merge_cells(start_row=start_row, start_column=1, end_row=end_row, end_column=1)
             sheet.merge_cells(start_row=start_row, start_column=6, end_row=end_row, end_column=6)
@@ -266,6 +268,9 @@ class ReportEngine:
             cell.font = Font(bold=True)
             cell.fill = PatternFill("solid", fgColor=fill)
             cell.alignment = Alignment(horizontal="left", vertical="center")
+
+    def _sum_profit(self, records) -> float:
+        return sum(float(record.get("total_profit", 0.0) or 0.0) for record in records)
 
     def _set_column_widths(self, sheet) -> None:
         widths = {

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
     QMessageBox,
@@ -56,6 +57,7 @@ class EntryView(QWidget):
         self._date_edit.setDisplayFormat("yyyy-MM-dd")
         self._date_edit.setCalendarPopup(True)
         self._date_edit.setObjectName("DateEdit")
+        self._date_edit.dateChanged.connect(self._load_today)
         date_layout.addWidget(self._date_edit)
         date_layout.addStretch()
         layout.addWidget(date_frame)
@@ -70,6 +72,27 @@ class EntryView(QWidget):
         self._fields_layout.setSpacing(18)
         self._scroll_area.setWidget(self._fields_container)
         layout.addWidget(self._scroll_area, stretch=1)
+
+        note_frame = QFrame()
+        note_frame.setObjectName("FieldsFrame")
+        note_layout = QVBoxLayout(note_frame)
+        note_layout.setContentsMargins(18, 16, 18, 16)
+        note_layout.setSpacing(10)
+
+        note_label = QLabel("备注")
+        note_label.setObjectName("SectionLabel")
+        note_layout.addWidget(note_label)
+
+        note_hint = QLabel("备注会同步到历史表格和 Excel 导出。留空时不会覆盖这一天已保存的旧备注。")
+        note_hint.setObjectName("HintLabel")
+        note_layout.addWidget(note_hint)
+
+        self._note_input = QTextEdit()
+        self._note_input.setObjectName("FieldInput")
+        self._note_input.setPlaceholderText("输入当天备注，例如：租金已支付、活动日营业额偏高")
+        self._note_input.setMinimumHeight(96)
+        note_layout.addWidget(self._note_input)
+        layout.addWidget(note_frame)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -210,7 +233,8 @@ class EntryView(QWidget):
             return
 
         date_str = self._date_edit.date().toString("yyyy-MM-dd")
-        self._db.upsert_record(date_str, total_profit, raw_data)
+        note_text = self._note_input.toPlainText().strip()
+        self._db.upsert_record(date_str, total_profit, raw_data, note_text)
         event_bus.data_changed.emit()
 
         QMessageBox.information(
@@ -229,6 +253,7 @@ class EntryView(QWidget):
         if not record:
             for line_edit in self._field_inputs.values():
                 line_edit.clear()
+            self._note_input.clear()
             return
 
         raw_data = record["raw_data"]
@@ -240,6 +265,7 @@ class EntryView(QWidget):
             else:
                 value = raw_data.get(field_name, "")
             line_edit.setText(str(value) if value else "")
+        self._note_input.setPlainText(record.get("note", ""))
 
     def _clear_layout(self, layout) -> None:
         while layout.count():

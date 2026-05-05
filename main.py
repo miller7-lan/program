@@ -17,12 +17,12 @@ main.py — 利润助手程序入口
 """
 
 import sys
-from pathlib import Path
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 
+from core.app_paths import resource_path
 from core.database import DatabaseManager
 from ui.main_window import MainWindow
 
@@ -36,7 +36,7 @@ def main() -> None:
     app = QApplication(sys.argv)
     app.setApplicationName("利润助手")
     app.setOrganizationName("HomeApp")
-    icon_path = Path(__file__).resolve().parent / "assets" / "app_icon.png"
+    icon_path = resource_path("assets", "app_icon.png")
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
 

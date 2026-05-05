@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.app_paths import resource_path
 from ui.dashboard_view import DashboardView
 from ui.entry_view import EntryView
 from ui.history_view import HistoryView
@@ -88,9 +89,7 @@ class MainWindow(QMainWindow):
 
     def _apply_app_icon(self) -> None:
         """加载应用图标，用于窗口标题栏和任务栏。"""
-        from pathlib import Path
-
-        icon_path = Path(__file__).resolve().parent.parent / "assets" / "app_icon.png"
+        icon_path = resource_path("assets", "app_icon.png")
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
 
@@ -175,11 +174,8 @@ class MainWindow(QMainWindow):
 
     def _apply_styles(self) -> None:
         """从 assets/style.qss 加载样式表，加载失败则使用内置默认样式。"""
-        import os
-        qss_path = os.path.join(os.path.dirname(__file__), "..", "assets", "style.qss")
-        qss_path = os.path.normpath(qss_path)
         try:
-            with open(qss_path, encoding="utf-8") as f:
+            with resource_path("assets", "style.qss").open(encoding="utf-8") as f:
                 self.setStyleSheet(f.read())
         except FileNotFoundError:
             self._apply_fallback_styles()

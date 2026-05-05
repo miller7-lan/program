@@ -4,12 +4,12 @@ ui/history_view.py
 
 骨架说明：
   - 顶部：日期范围筛选 + 查询按钮
-  - 中部：QTableWidget 展示记录（日期 / 总利润 / 原始数据摘要）
+  - 中部：QTableWidget 展示记录（日期 / 总利润 / 原始数据摘要 / 备注）
   - 底部：删除选中行 + 导出 Excel 按钮
   - 监听 event_bus.data_changed → 自动刷新表格
 """
 
-from PySide6.QtCore import QDate, QThread, Signal
+from PySide6.QtCore import QDate, QSignalBlocker, QThread, Signal
 from PySide6.QtWidgets import (
     QDateEdit,
     QFileDialog,
@@ -59,6 +59,8 @@ class ExportWorker(QThread):
 class HistoryView(QWidget):
     """历史记录视图：表格展示、筛选、删除与导出。"""
 
+    START_DATE_CONFIG_KEY = "history_start_date"
+
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self._db = db
@@ -78,14 +80,15 @@ class HistoryView(QWidget):
         filter_row.setSpacing(10)
 
         filter_row.addWidget(QLabel("从："))
-        self._start_date = QDateEdit(QDate.currentDate().addMonths(-1))
+        self._start_date = QDateEdit()
         self._start_date.setDisplayFormat("yyyy-MM-dd")
         self._start_date.setCalendarPopup(True)
         self._start_date.setObjectName("DateEdit")
+        self._start_date.dateChanged.connect(self._remember_start_date)
         filter_row.addWidget(self._start_date)
 
         filter_row.addWidget(QLabel("至："))
-        self._end_date = QDateEdit(QDate.currentDate())
+        self._end_date = QDateEdit()
         self._end_date.setDisplayFormat("yyyy-MM-dd")
         self._end_date.setCalendarPopup(True)
         self._end_date.setObjectName("DateEdit")
@@ -100,9 +103,10 @@ class HistoryView(QWidget):
 
         self._table = QTableWidget()
         self._table.setObjectName("HistoryTable")
-        self._table.setColumnCount(3)
-        self._table.setHorizontalHeaderLabels(["日期", "利润（元）", "原始数据摘要"])
+        self._table.setColumnCount(4)
+        self._table.setHorizontalHeaderLabels(["日期", "利润（元）", "原始数据摘要", "备注"])
         self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setAlternatingRowColors(True)
@@ -122,6 +126,8 @@ class HistoryView(QWidget):
         action_row.addWidget(export_btn)
         layout.addLayout(action_row)
 
+        self._load_filter_defaults()
+
     def refresh(self) -> None:
         start = self._start_date.date().toString("yyyy-MM-dd")
         end = self._end_date.date().toString("yyyy-MM-dd")
@@ -132,6 +138,7 @@ class HistoryView(QWidget):
             self._table.setItem(row_idx, 0, QTableWidgetItem(rec["date"]))
             self._table.setItem(row_idx, 1, QTableWidgetItem(f"{rec['total_profit']:.2f}"))
             self._table.setItem(row_idx, 2, QTableWidgetItem(summarize_raw_data(rec["raw_data"])))
+            self._table.setItem(row_idx, 3, QTableWidgetItem(rec.get("note", "")))
 
     def _on_delete(self) -> None:
         selected = self._table.selectedItems()
@@ -194,5 +201,28 @@ class HistoryView(QWidget):
         self._export_thread.start()
 
     def showEvent(self, event) -> None:
+        self._sync_end_date_to_today()
         self.refresh()
         super().showEvent(event)
+
+    def _load_filter_defaults(self) -> None:
+        saved_start = self._db.get_config(
+            self.START_DATE_CONFIG_KEY,
+            QDate.currentDate().addMonths(-1).toString("yyyy-MM-dd"),
+        )
+        start_date = QDate.fromString(saved_start, "yyyy-MM-dd")
+        if not start_date.isValid():
+            start_date = QDate.currentDate().addMonths(-1)
+
+        with QSignalBlocker(self._start_date):
+            self._start_date.setDate(start_date)
+
+        self._sync_end_date_to_today()
+
+    def _sync_end_date_to_today(self) -> None:
+        today = QDate.currentDate()
+        with QSignalBlocker(self._end_date):
+            self._end_date.setDate(today)
+
+    def _remember_start_date(self, date: QDate) -> None:
+        self._db.set_config(self.START_DATE_CONFIG_KEY, date.toString("yyyy-MM-dd"))

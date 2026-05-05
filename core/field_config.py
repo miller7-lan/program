@@ -10,9 +10,16 @@ from typing import Any
 
 
 DEFAULT_FIELD_TREE = [
-    {"name": "营业额", "children": []},
-    {"name": "成本", "children": []},
+    {"name": "营业额", "children": ["账户", "微信分", "微信分欠", "现金", "邮政账户"]},
+    {"name": "成本", "children": ["小肠", "猪肚", "昨日零钱", "肥肠", "牛肚", "牛肠", "牛碎筋", "肚带", "羊杂", "羊肠", "猪肺", "牛熟", "生牛副筋", "袋子", "毛肚", "运费", "水电", "代买", "龙虾"]},
+    {"name": "零钱", "children": []},
+    {"name": "营业额备注", "children": []},
 ]
+
+DEFAULT_PROFIT_FORMULA = (
+    "账户 + 邮政账户 + 微信分 + 微信分欠 + 现金 - 小肠 - 猪肚 - 羊杂 - 肥肠 - 牛肚 - 牛肠 - 牛碎筋 "
+    "- 肚带 - 猪肺 - 羊肠 - 昨日零钱 - 牛熟 - 生牛副筋 - 袋子 - 毛肚 - 运费 - 水电 - 代买 - 龙虾"
+)
 
 
 def load_field_tree_from_json(config_value: str | None) -> list[dict[str, Any]]:

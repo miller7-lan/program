@@ -59,16 +59,39 @@ python main.py
 > **注意**：必须在 Windows 10/11 机器（或 Mac 虚拟机中的 Windows）上执行以下命令。
 > 在 macOS 上 PyInstaller 只能打出 macOS 版本。
 
+### 双击一键打包
+
+项目根目录已经提供：
+
+```bash
+build_windows_exe.bat
+```
+
+在 Windows 电脑上直接双击它即可自动完成：
+
+- 创建 `.venv-win` 虚拟环境
+- 使用清华镜像安装依赖，减少掉线和下载失败
+- 自动清理旧的 `build/`、`dist/`
+- 自动生成 `dist/利润助手.exe`
+
+如果电脑还没有 Python 3.11+，脚本会先提示安装。
+
+### 手动命令行打包
+
 ```bash
 # 在 Windows 机器上：
-pip install pyinstaller
-pyinstaller --noconsole --onefile ^
+python -m venv .venv-win
+.venv-win\Scripts\activate
+python -m pip install --upgrade pip setuptools wheel -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
+pyinstaller --noconfirm --clean --windowed --onefile ^
+  --name "利润助手" ^
   --icon assets/app_icon.ico ^
   --add-data "assets;assets" ^
   main.py
 ```
 
-生成的 `.exe` 位于 `dist/main.exe`，可直接复制到目标电脑运行，无需安装 Python。
+生成的 `.exe` 位于 `dist/利润助手.exe`，可直接复制到目标电脑运行，无需安装 Python。
 
 如果在 macOS 打包 `.app`，可使用：
 
@@ -84,6 +107,7 @@ pyinstaller --windowed --onedir \
 - 数据存储在 `family_ledger.db`（SQLite 单文件），位于程序同级目录
 - 每日记录以 JSON 格式存储自定义字段，支持随时增减账目类型
 - 利润计算公式可在设置页自由配置，例如 `营业额 - 成本` 或 `(营业额 - 成本) * 0.9`
+- Windows 打包后的 `.exe` 首次运行时，也会在 `exe` 同级目录自动生成 `family_ledger.db`
 
 ## 架构亮点
 

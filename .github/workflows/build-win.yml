@@ -21,11 +21,10 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --noconsole --onefile --name "利润助手" main.py
+        pyinstaller --noconfirm --clean --windowed --onefile --name "利润助手" --icon assets/app_icon.ico --add-data "assets;assets" main.py
 
     - name: Create Zip Archive
       run: |
