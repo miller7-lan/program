@@ -24,14 +24,14 @@ jobs:
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --noconfirm --clean --windowed --onefile --name "利润助手" --icon assets/app_icon.ico --add-data "assets;assets" main.py
+        pyinstaller --noconfirm --clean --windowed --onefile --name "ProfitHelper" --icon assets/app_icon.ico --add-data "assets;assets" main.py
 
     - name: Create Zip Archive
       run: |
-         powershell Compress-Archive -Path "dist\利润助手.exe" -DestinationPath "利润助手_Windows_v1.0.zip"
+         powershell Compress-Archive -Path "dist\ProfitHelper.exe" -DestinationPath "ProfitHelper_Windows_v1.0.zip"
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: BusinessHelper_Windows
-        path: 利润助手_Windows_v1.0.zip
+        path: ProfitHelper_Windows_v1.0.zip

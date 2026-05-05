@@ -72,9 +72,10 @@ build_windows_exe.bat
 - 创建 `.venv-win` 虚拟环境
 - 使用清华镜像安装依赖，减少掉线和下载失败
 - 自动清理旧的 `build/`、`dist/`
-- 自动生成 `dist/利润助手.exe`
+- 自动生成 `dist/ProfitHelper.exe`
 
 如果电脑还没有 Python 3.11+，脚本会先提示安装。
+如果打包失败，脚本不会闪退，并会生成 `build_windows_exe.log` 方便排查。
 
 ### 手动命令行打包
 
@@ -85,13 +86,13 @@ python -m venv .venv-win
 python -m pip install --upgrade pip setuptools wheel -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
 pyinstaller --noconfirm --clean --windowed --onefile ^
-  --name "利润助手" ^
+  --name "ProfitHelper" ^
   --icon assets/app_icon.ico ^
   --add-data "assets;assets" ^
   main.py
 ```
 
-生成的 `.exe` 位于 `dist/利润助手.exe`，可直接复制到目标电脑运行，无需安装 Python。
+生成的 `.exe` 位于 `dist/ProfitHelper.exe`，可直接复制到目标电脑运行，无需安装 Python。
 
 如果在 macOS 打包 `.app`，可使用：
 
