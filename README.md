@@ -84,8 +84,8 @@ build_windows_exe.bat
 python -m venv .venv-win
 .venv-win\Scripts\activate
 python -m pip install --upgrade pip setuptools wheel -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
-pyinstaller --noconfirm --clean --windowed --onefile ^
+python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
+python -m PyInstaller --noconfirm --clean --windowed --onefile ^
   --name "ProfitHelper" ^
   --icon assets/app_icon.ico ^
   --add-data "assets;assets" ^

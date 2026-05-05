@@ -73,7 +73,7 @@ if errorlevel 1 (
 )
 
 echo [5/6] Installing dependencies from Tsinghua mirror...
-pip install -r requirements.txt -i %PIP_INDEX_URL% --trusted-host %PIP_TRUSTED_HOST% >> "%LOG_FILE%" 2>&1
+python -m pip install -r requirements.txt -i %PIP_INDEX_URL% --trusted-host %PIP_TRUSTED_HOST% >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
     call :fail Failed to install requirements.txt.
     goto :finish
@@ -83,7 +83,7 @@ echo [6/6] Building EXE...
 if exist "%SCRIPT_DIR%build" rmdir /s /q "%SCRIPT_DIR%build" >> "%LOG_FILE%" 2>&1
 if exist "%SCRIPT_DIR%dist" rmdir /s /q "%SCRIPT_DIR%dist" >> "%LOG_FILE%" 2>&1
 
-pyinstaller --noconfirm --clean --windowed --onefile --name "ProfitHelper" --icon "assets\app_icon.ico" --add-data "assets;assets" main.py >> "%LOG_FILE%" 2>&1
+python -m PyInstaller --noconfirm --clean --windowed --onefile --name "ProfitHelper" --icon "assets\app_icon.ico" --add-data "assets;assets" main.py >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
     call :fail PyInstaller build failed.
     goto :finish
