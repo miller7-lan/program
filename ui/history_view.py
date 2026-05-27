@@ -9,8 +9,9 @@ ui/history_view.py
   - 监听 event_bus.data_changed → 自动刷新表格
 """
 
-from PySide6.QtCore import QDate, QSignalBlocker, QThread, Signal
+from PySide6.QtCore import QDate, QSignalBlocker, QThread, Qt, Signal
 from PySide6.QtWidgets import (
+    QAbstractItemView,
     QDateEdit,
     QFileDialog,
     QHBoxLayout,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollBar,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -105,12 +107,26 @@ class HistoryView(QWidget):
         self._table.setObjectName("HistoryTable")
         self._table.setColumnCount(4)
         self._table.setHorizontalHeaderLabels(["日期", "利润（元）", "原始数据摘要", "备注"])
-        self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header = self._table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self._table.setColumnWidth(0, 170)
+        self._table.setColumnWidth(1, 170)
+        self._table.setColumnWidth(2, 860)
+        self._table.setColumnWidth(3, 420)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setAlternatingRowColors(True)
+        self._table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         layout.addWidget(self._table)
+
+        self._table_slider = QScrollBar(Qt.Orientation.Horizontal)
+        self._table_slider.setObjectName("HistoryTableSlider")
+        layout.addWidget(self._table_slider)
+        self._bind_table_slider()
 
         action_row = QHBoxLayout()
         action_row.addStretch()
@@ -226,3 +242,22 @@ class HistoryView(QWidget):
 
     def _remember_start_date(self, date: QDate) -> None:
         self._db.set_config(self.START_DATE_CONFIG_KEY, date.toString("yyyy-MM-dd"))
+
+    def _bind_table_slider(self) -> None:
+        table_bar = self._table.horizontalScrollBar()
+        self._table_slider.setRange(table_bar.minimum(), table_bar.maximum())
+        self._table_slider.setPageStep(table_bar.pageStep())
+        self._table_slider.setSingleStep(table_bar.singleStep())
+        self._table_slider.setValue(table_bar.value())
+        self._table_slider.setVisible(table_bar.maximum() > 0)
+
+        table_bar.rangeChanged.connect(self._sync_table_slider_range)
+        table_bar.valueChanged.connect(self._table_slider.setValue)
+        self._table_slider.valueChanged.connect(table_bar.setValue)
+
+    def _sync_table_slider_range(self, minimum: int, maximum: int) -> None:
+        table_bar = self._table.horizontalScrollBar()
+        self._table_slider.setRange(minimum, maximum)
+        self._table_slider.setPageStep(table_bar.pageStep())
+        self._table_slider.setSingleStep(table_bar.singleStep())
+        self._table_slider.setVisible(maximum > minimum)

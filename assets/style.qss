@@ -457,6 +457,30 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
 }
 
+#HistoryTableSlider, QScrollBar:horizontal {
+    background: #ECEAFB;
+    height: 16px;
+    border-radius: 8px;
+    margin: 2px 0 6px 0;
+}
+
+#HistoryTableSlider::handle, QScrollBar::handle:horizontal {
+    background: #BDB5F8;
+    min-width: 72px;
+    border-radius: 8px;
+}
+
+#HistoryTableSlider::handle:hover, QScrollBar::handle:horizontal:hover {
+    background: #8D80F0;
+}
+
+#HistoryTableSlider::add-line,
+#HistoryTableSlider::sub-line,
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
 /* ──── 消息框 ──── */
 QMessageBox {
     background-color: #FFFFFF;
