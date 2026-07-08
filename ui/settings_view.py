@@ -4,9 +4,11 @@ ui/settings_view.py
 """
 
 import json
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QFileDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -177,6 +179,31 @@ class SettingsView(QWidget):
         save_btn.clicked.connect(self._on_save)
         save_row.addWidget(save_btn)
         layout.addLayout(save_row)
+
+        backup_section_label = QLabel("数据导入导出")
+        backup_section_label.setObjectName("SectionLabel")
+        layout.addWidget(backup_section_label)
+
+        backup_hint = QLabel("导出会生成 family_ledger.db 格式的完整账本；导入会替换当前所有历史记录和设置。")
+        backup_hint.setObjectName("HintLabel")
+        backup_hint.setWordWrap(True)
+        layout.addWidget(backup_hint)
+
+        backup_row = QHBoxLayout()
+        backup_row.addStretch()
+
+        import_btn = QPushButton("📥  导入账本")
+        import_btn.setObjectName("SecondaryButton")
+        import_btn.setMinimumHeight(42)
+        import_btn.clicked.connect(self._on_import_database)
+        backup_row.addWidget(import_btn)
+
+        export_btn = QPushButton("📤  导出账本")
+        export_btn.setObjectName("SecondaryButton")
+        export_btn.setMinimumHeight(42)
+        export_btn.clicked.connect(self._on_export_database)
+        backup_row.addWidget(export_btn)
+        layout.addLayout(backup_row)
 
         self._load_config()
 
@@ -522,6 +549,58 @@ class SettingsView(QWidget):
 
         event_bus.config_changed.emit()
         QMessageBox.information(self, "保存成功", "设置已保存，录入页和导出报表都会按新层级展示。")
+
+    def _on_export_database(self) -> None:
+        save_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "导出账本",
+            str(Path.home() / "family_ledger.db"),
+            "SQLite 数据库 (*.db)",
+        )
+        if not save_path:
+            return
+
+        try:
+            exported_path = self._db.export_database(save_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "导出失败", f"导出过程中发生错误：\n{exc}")
+            return
+
+        QMessageBox.information(self, "导出成功", f"账本已导出至：\n{exported_path}")
+
+    def _on_import_database(self) -> None:
+        import_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "导入账本",
+            str(Path.home()),
+            "SQLite 数据库 (*.db)",
+        )
+        if not import_path:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "确认导入",
+            "导入后会替换当前所有历史记录和设置。\n确定继续吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            result = self._db.import_database(import_path)
+        except Exception as exc:
+            QMessageBox.critical(self, "导入失败", f"导入文件不符合账本格式，或读取失败：\n{exc}")
+            return
+
+        self._load_config()
+        event_bus.config_changed.emit()
+        event_bus.data_changed.emit()
+        QMessageBox.information(
+            self,
+            "导入成功",
+            f"已导入 {result['records']} 条历史记录、{result['configs']} 项设置。",
+        )
 
     def _update_selected_hint(self) -> None:
         if self._selected_path is None:

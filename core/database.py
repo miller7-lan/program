@@ -153,6 +153,76 @@ class DatabaseManager:
             self._conn.execute("DELETE FROM DailyRecords WHERE date = ?", (date,))
 
     # ─────────────────────────────────────────────
+    # 导入 / 导出
+    # ─────────────────────────────────────────────
+
+    def export_database(self, export_path: str | Path) -> Path:
+        """将当前账本导出为兼容格式的 SQLite 数据库文件。"""
+        export_path = Path(export_path)
+        if export_path.resolve() == self.db_path.resolve():
+            raise ValueError("导出路径不能与当前正在使用的账本文件相同。")
+
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with sqlite3.connect(str(export_path)) as target_conn:
+            self._conn.backup(target_conn)
+            self._ensure_android_metadata(target_conn)
+
+        return export_path
+
+    def import_database(self, import_path: str | Path) -> dict[str, int]:
+        """从兼容格式的 SQLite 数据库导入数据，并替换当前账本。"""
+        import_path = Path(import_path)
+        if not import_path.exists():
+            raise FileNotFoundError(f"导入文件不存在：{import_path}")
+
+        with sqlite3.connect(str(import_path)) as source_conn:
+            source_conn.row_factory = sqlite3.Row
+            self._validate_import_schema(source_conn)
+
+            record_rows = source_conn.execute(
+                "SELECT date, total_profit, raw_data, note FROM DailyRecords ORDER BY date ASC"
+            ).fetchall()
+            config_rows = source_conn.execute(
+                "SELECT key, value FROM Config ORDER BY key ASC"
+            ).fetchall()
+
+            records = []
+            for row in record_rows:
+                raw_data = row["raw_data"] or "{}"
+                try:
+                    json.loads(raw_data)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"{row['date']} 的 raw_data 不是合法 JSON。") from exc
+
+                records.append((
+                    str(row["date"]),
+                    float(row["total_profit"] or 0.0),
+                    raw_data,
+                    row["note"] or "",
+                ))
+
+            configs = [(str(row["key"]), row["value"] or "") for row in config_rows]
+
+        with self._conn:
+            self._conn.execute("DELETE FROM DailyRecords")
+            self._conn.execute("DELETE FROM Config")
+            self._conn.executemany(
+                """
+                INSERT INTO DailyRecords (date, total_profit, raw_data, note)
+                VALUES (?, ?, ?, ?)
+                """,
+                records,
+            )
+            self._conn.executemany(
+                "INSERT INTO Config (key, value) VALUES (?, ?)",
+                configs,
+            )
+
+        self._initialize_tables()
+        return {"records": len(records), "configs": len(configs)}
+
+    # ─────────────────────────────────────────────
     # Config CRUD
     # ─────────────────────────────────────────────
 
@@ -183,3 +253,36 @@ class DatabaseManager:
     def close(self) -> None:
         """关闭数据库连接（程序退出时调用）。"""
         self._conn.close()
+
+    def _validate_import_schema(self, conn: sqlite3.Connection) -> None:
+        tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+        missing_tables = {"DailyRecords", "Config"} - tables
+        if missing_tables:
+            raise ValueError(f"导入文件缺少表：{', '.join(sorted(missing_tables))}")
+
+        daily_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(DailyRecords)").fetchall()
+        }
+        missing_daily = {"date", "total_profit", "raw_data", "note"} - daily_columns
+        if missing_daily:
+            raise ValueError(f"DailyRecords 缺少字段：{', '.join(sorted(missing_daily))}")
+
+        config_columns = {
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(Config)").fetchall()
+        }
+        missing_config = {"key", "value"} - config_columns
+        if missing_config:
+            raise ValueError(f"Config 缺少字段：{', '.join(sorted(missing_config))}")
+
+    def _ensure_android_metadata(self, conn: sqlite3.Connection) -> None:
+        conn.execute("CREATE TABLE IF NOT EXISTS android_metadata (locale TEXT)")
+        exists = conn.execute("SELECT 1 FROM android_metadata LIMIT 1").fetchone()
+        if not exists:
+            conn.execute("INSERT INTO android_metadata (locale) VALUES (?)", ("zh_CN",))
