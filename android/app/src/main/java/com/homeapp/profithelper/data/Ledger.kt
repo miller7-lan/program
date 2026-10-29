@@ -26,15 +26,21 @@ data class DailyRecord(
 )
 
 /** 本机账本。表结构与同步规则和桌面端 core/database.py 保持一致（删除的记录保留墓碑以便同步）。 */
-class Ledger(private val context: Context) {
+class Ledger(private val context: Context, dbName: String = "ledger.db") {
 
     companion object {
         val SYNCED_CONFIG_KEYS = listOf("custom_field_tree", "custom_fields", "profit_formula")
         const val LEGACY_MODIFIED_AT = 1L
+        /** 与同步服务器的限制一致，超出的数据无法上传。 */
+        const val NOTE_MAX_CHARS = 4000
+        private val DATE_RE = Regex("^\\d{4}-\\d{2}-\\d{2}$")
         fun nowMs(): Long = System.currentTimeMillis()
+
+        fun isValidDate(text: String): Boolean =
+            DATE_RE.matches(text) && runCatching { java.time.LocalDate.parse(text) }.isSuccess
     }
 
-    private val helper = object : SQLiteOpenHelper(context, "ledger.db", null, 1) {
+    private val helper = object : SQLiteOpenHelper(context, dbName, null, 1) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
                 """CREATE TABLE records (
@@ -257,6 +263,18 @@ class Ledger(private val context: Context) {
         return count
     }
 
+    /** 待上传记录中日期格式不正确的（只可能来自外部导入），这些记录不能上传。 */
+    fun invalidDirtyDates(): List<String> {
+        db.rawQuery("SELECT date FROM records WHERE dirty = 1", null).use {
+            return buildList {
+                while (it.moveToNext()) {
+                    val date = it.getString(0)
+                    if (!isValidDate(date)) add(date)
+                }
+            }
+        }
+    }
+
     fun collectDirtyRecords(limit: Int, exclude: Set<String> = emptySet()): List<JSONObject> {
         val result = mutableListOf<JSONObject>()
         db.rawQuery(
@@ -463,6 +481,8 @@ class Ledger(private val context: Context) {
                 require(missingColumns.isEmpty()) { "DailyRecords 缺少字段：${missingColumns.joinToString()}" }
                 src.rawQuery("SELECT date, total_profit, raw_data, note FROM DailyRecords ORDER BY date", null).use {
                     while (it.moveToNext()) {
+                        val date = it.getString(0) ?: ""
+                        require(isValidDate(date)) { "导入文件中有无效日期：$date（应为 YYYY-MM-DD），未做任何修改。" }
                         val rawText = it.getString(2) ?: "{}"
                         try {
                             JSONObject(rawText)

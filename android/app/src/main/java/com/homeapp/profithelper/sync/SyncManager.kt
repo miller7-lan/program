@@ -25,6 +25,8 @@ enum class SyncTone { OFF, OK, BUSY, ERROR }
 data class SyncStatus(val tone: SyncTone, val title: String, val detail: String)
 
 /**
+ * 同步密钥被拒绝后暂停自动同步（只保留手动“立即同步”），避免旧密钥反复请求触发服务器的失败次数限制。
+ *
  * 同步调度：
  *  - 应用回到前台时同步一次，前台期间每 5 分钟一次
  *  - 本机保存 / 删除 / 修改设置后 2.5 秒（合并连续修改）
@@ -40,6 +42,8 @@ class SyncManager(
     @Volatile private var pending = false
     @Volatile private var busy = false
     @Volatile private var lastError: String? = null
+    @Volatile private var authFailed = false
+    @Volatile private var invalid: List<Pair<String, String>> = emptyList()
     private var debounceJob: Job? = null
     private var periodicJob: Job? = null
 
@@ -62,7 +66,7 @@ class SyncManager(
 
     fun onLocalChange() {
         refresh()
-        if (!configured || !autoEnabled) return
+        if (!configured || !autoEnabled || authFailed) return
         debounceJob?.cancel()
         debounceJob = scope.launch {
             delay(2500)
@@ -73,12 +77,12 @@ class SyncManager(
     fun onForeground() {
         refresh()
         if (!configured || !autoEnabled) return
-        syncNow()
+        if (!authFailed) syncNow()
         periodicJob?.cancel()
         periodicJob = scope.launch {
             while (isActive) {
                 delay(5 * 60 * 1000L)
-                syncNow()
+                if (!authFailed) syncNow()
             }
         }
     }
@@ -86,15 +90,16 @@ class SyncManager(
     fun onBackground() {
         periodicJob?.cancel()
         periodicJob = null
-        if (configured && autoEnabled && (debounceJob?.isActive == true || ledger.countPendingChanges() > 0)) {
+        if (configured && autoEnabled && !authFailed && (debounceJob?.isActive == true || ledger.countPendingChanges() > 0)) {
             debounceJob?.cancel()
             syncNow()
         }
     }
 
-    fun saveConfig(config: SyncConfig, deviceName: String) {
+    fun saveConfig(config: SyncConfig, deviceName: String, fromPreset: Boolean = false) {
         engine.saveConfig(config)
-        ledger.setMetas(mapOf("preset_disabled" to "0"))
+        ledger.setMetas(mapOf("preset_disabled" to "0", "config_source" to if (fromPreset) "preset" else "manual"))
+        authFailed = false
         if (deviceName.isNotBlank()) ledger.setMetas(mapOf("device_name" to deviceName.trim().take(40)))
         lastError = null
         refresh()
@@ -123,7 +128,12 @@ class SyncManager(
                 try {
                     val result = engine.sync()
                     lastError = null
+                    authFailed = false
+                    invalid = result.invalid.toList()
                     if (result.recordsChanged || result.settingsChanged) _messages.tryEmit("已从云端同步：${result.summary}")
+                } catch (e: SyncAuthException) {
+                    authFailed = true
+                    lastError = "同步密钥不正确，已暂停自动同步。请安装新版安装包，或在“更换服务器”中重新填写"
                 } catch (e: SyncException) {
                     lastError = e.message
                 } catch (e: Exception) {
@@ -148,7 +158,11 @@ class SyncManager(
         if (!engine.isConfigured()) return SyncStatus(SyncTone.OFF, "未开启云同步", "到设置里粘贴连接码即可")
         val last = describeTime(ledger.getMeta("last_sync_at").toLongOrNull() ?: 0L)
         if (busy) return SyncStatus(SyncTone.BUSY, "正在同步…", if (last.isEmpty()) "首次同步" else "上次 $last")
-        lastError?.let { return SyncStatus(SyncTone.ERROR, "同步失败", it) }
+        lastError?.let { return SyncStatus(SyncTone.ERROR, if (authFailed) "同步密钥不正确" else "同步失败", it) }
+        invalid.firstOrNull()?.let { (date, reason) ->
+            val more = if (invalid.size > 1) " 等 ${invalid.size} 条" else ""
+            return SyncStatus(SyncTone.ERROR, "部分记录无法同步", "$date$more：$reason")
+        }
         val pendingCount = ledger.countPendingChanges()
         var detail = if (last.isEmpty()) "尚未同步" else "上次 $last"
         if (pendingCount > 0) detail += " · $pendingCount 项待上传"

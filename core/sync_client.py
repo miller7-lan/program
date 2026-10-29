@@ -282,6 +282,9 @@ class SyncEngine:
         result = SyncResult()
         invalid_dates: set[str] = set()
         settings_invalid = False
+        for bad_date in self.db.invalid_dirty_dates():
+            invalid_dates.add(bad_date)
+            result.invalid.append((bad_date, "日期格式不正确，无法同步"))
 
         for _ in range(MAX_ROUNDS):
             records = self.db.collect_dirty_records(PUSH_BATCH, exclude=invalid_dates)

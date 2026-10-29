@@ -9,6 +9,7 @@ import com.homeapp.profithelper.core.FieldNode
 import com.homeapp.profithelper.core.FormulaEngine
 import com.homeapp.profithelper.core.FormulaException
 import com.homeapp.profithelper.core.RawData
+import com.homeapp.profithelper.data.DailyRecord
 import com.homeapp.profithelper.data.ISO
 import com.homeapp.profithelper.data.Ledger
 import com.homeapp.profithelper.data.fmtAmountInput
@@ -41,7 +42,11 @@ class EntryController(private val ledger: Ledger) {
         private set
     var note by mutableStateOf("")
     var pendingDate by mutableStateOf<LocalDate?>(null)
+    /** 保存时发现这一天在编辑期间已被云同步更新，等待用户决定是否覆盖。 */
+    var conflictPending by mutableStateOf(false)
+        private set
     val values = mutableStateMapOf<String, String>()
+    private var loadedRecord: DailyRecord? = null
 
     private var snapshotValues: Map<String, Any> = emptyMap()
     private var snapshotNote = ""
@@ -67,6 +72,7 @@ class EntryController(private val ledger: Ledger) {
         tree = ledger.fieldTree()
         formula = ledger.profitFormula()
         val record = ledger.getRecord(target.format(ISO))
+        loadedRecord = record
         hasRecord = record != null
         val raw = record?.rawData ?: emptyMap()
         values.clear()
@@ -138,9 +144,13 @@ class EntryController(private val ledger: Ledger) {
         values[key] = fmtAmountInput(value).ifEmpty { "0" }
     }
 
-    fun saveAndReport(): Boolean {
+    fun saveAndReport(force: Boolean = false): Boolean {
         firstInvalidKey()?.let {
             UiEvents.show("「${displayName(it)}」请输入数字或算式")
+            return false
+        }
+        if (note.trim().length > Ledger.NOTE_MAX_CHARS) {
+            UiEvents.show("备注最多 ${Ledger.NOTE_MAX_CHARS} 个字，请精简后再保存")
             return false
         }
         val raw = rawData()
@@ -149,6 +159,12 @@ class EntryController(private val ledger: Ledger) {
             UiEvents.show("利润公式有误：$error")
             return false
         }
+        // 打开这一天之后它被云同步（其他设备）改过：先让用户确认，避免静默覆盖
+        if (!force && ledger.getRecord(date.format(ISO)) != loadedRecord) {
+            conflictPending = true
+            return false
+        }
+        conflictPending = false
         ledger.upsertRecord(date.format(ISO), profit, raw, note.trim())
         load(date)
         UiEvents.show("已保存 ${dateTitle()} · 利润 ${fmtMoney(profit)}")
@@ -156,4 +172,14 @@ class EntryController(private val ledger: Ledger) {
     }
 
     fun discard() = load(date)
+
+    /** choice：true = 仍然保存，false = 载入最新数据，null = 取消（继续编辑）。 */
+    fun resolveConflict(choice: Boolean?) {
+        conflictPending = false
+        when (choice) {
+            true -> saveAndReport(force = true)
+            false -> load(date)
+            null -> Unit
+        }
+    }
 }

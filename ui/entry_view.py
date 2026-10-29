@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.database import NOTE_MAX_CHARS
 from core.event_bus import event_bus
 from core.field_config import build_formula_variables, load_field_tree_from_json
 from core.formula_engine import FormulaEngine, FormulaError, normalize_formula
@@ -102,6 +103,7 @@ class EntryView(QWidget):
         self._child_grids: list[tuple[QGridLayout, list[QWidget]]] = []
         self._grid_columns = 0
         self._snapshot: tuple | None = None
+        self._loaded_record: dict | None = None
         self._has_record = False
         self._current_date = QDate.currentDate()
 
@@ -455,6 +457,7 @@ class EntryView(QWidget):
     def _load_current_date(self) -> None:
         date_str = self._current_date.toString("yyyy-MM-dd")
         record = self._db.get_record(date_str)
+        self._loaded_record = record
         self._has_record = record is not None
         raw_data = record["raw_data"] if record else {}
         for field_name, line_edit in self._field_inputs.items():
@@ -502,6 +505,11 @@ class EntryView(QWidget):
 
         date_str = self._current_date.toString("yyyy-MM-dd")
         note_text = self._note_input.toPlainText().strip()
+        if len(note_text) > NOTE_MAX_CHARS:
+            QMessageBox.warning(self, "备注太长", f"备注最多 {NOTE_MAX_CHARS} 个字，当前 {len(note_text)} 个字，请精简后再保存。")
+            return False
+        if not self._confirm_overwrite_if_changed(date_str):
+            return False
         self._db.upsert_record(date_str, total_profit, raw_data, note_text)
         self._load_current_date()
         event_bus.data_changed.emit()
@@ -510,6 +518,25 @@ class EntryView(QWidget):
             "success",
         )
         return True
+
+    def _confirm_overwrite_if_changed(self, date_str: str) -> bool:
+        """打开这一天之后，若它被云同步（其他设备）改过，保存前先问，避免静默覆盖。"""
+        if self._db.get_record(date_str) == self._loaded_record:
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("这一天刚被其他设备修改过")
+        box.setText(f"{date_str} 在你编辑期间已通过云同步更新。\n继续保存会用你现在的输入覆盖它（被覆盖的版本仍保留在服务器上）。")
+        overwrite = box.addButton("仍然保存", QMessageBox.ButtonRole.AcceptRole)
+        reload_latest = box.addButton("载入最新数据", QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(reload_latest)
+        box.exec()
+        if box.clickedButton() is overwrite:
+            return True
+        if box.clickedButton() is reload_latest:
+            self._load_current_date()
+        return False
 
     # ─────────────────────────────────────
     # 外部变化

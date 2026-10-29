@@ -211,6 +211,10 @@ class SyncEngine(
         val result = SyncResult()
         val invalidDates = mutableSetOf<String>()
         var settingsInvalid = false
+        for (badDate in ledger.invalidDirtyDates()) {
+            invalidDates += badDate
+            result.invalid += badDate to "日期格式不正确，无法同步"
+        }
 
         for (round in 0 until MAX_ROUNDS) {
             val records = ledger.collectDirtyRecords(PUSH_BATCH, invalidDates)

@@ -26,12 +26,13 @@ android {
         applicationId = "com.homeapp.profithelper"
         minSdk = 26
         targetSdk = 36
-        versionCode = 110
-        versionName = "1.1.0"
+        versionCode = 111
+        versionName = "1.1.1"
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"${localProp("profitHelper.defaultServerUrl")}\"")
         buildConfigField("String", "DEFAULT_FALLBACK_IP", "\"${localProp("profitHelper.defaultFallbackIp")}\"")
-        // 内置连接码：首次打开自动连接服务器，用户无需填写（只来自本机 local.properties）
-        buildConfigField("String", "PRESET_CONNECTION_CODE", "\"${localProp("profitHelper.presetConnectionCode")}\"")
+        // 内置连接码只放进正式版（见 release）；调试版和测试永远不会自动连上真实账本
+        buildConfigField("String", "PRESET_CONNECTION_CODE", "\"\"")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -54,6 +55,8 @@ android {
             if (keystorePropsPath.isNotEmpty()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            // 内置连接码：首次打开自动连接服务器，用户无需填写（只来自本机 local.properties）
+            buildConfigField("String", "PRESET_CONNECTION_CODE", "\"${localProp("profitHelper.presetConnectionCode")}\"")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -102,4 +105,6 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

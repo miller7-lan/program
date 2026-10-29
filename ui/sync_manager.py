@@ -7,6 +7,9 @@ ui/sync_manager.py
   - 本机保存 / 删除 / 修改设置后 2.5 秒（合并连续修改）
   - 每 5 分钟一次
   - 用户点击“立即同步”
+
+同步密钥被拒绝后暂停自动同步（只保留手动“立即同步”），避免旧密钥反复请求触发服务器的失败次数限制，
+连带同一网络下的其他设备也被暂时拒绝。
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import threading
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from core.event_bus import event_bus
-from core.sync_client import SyncConfig, SyncEngine, SyncError, describe_time
+from core.sync_client import SyncAuthError, SyncConfig, SyncEngine, SyncError, describe_time
 from core.sync_preset import apply_preset_if_needed
 
 
@@ -35,13 +38,15 @@ class SyncManager(QObject):
         self.message = ""
         self._thread: threading.Thread | None = None
         self._pending = False
+        self._auth_failed = False
+        self._invalid: list[tuple[str, str]] = []
 
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
-        self._debounce.timeout.connect(self.sync_now)
+        self._debounce.timeout.connect(self._auto_sync)
         self._periodic = QTimer(self)
         self._periodic.setInterval(self.PERIODIC_MS)
-        self._periodic.timeout.connect(self.sync_now)
+        self._periodic.timeout.connect(self._auto_sync)
 
         self._worker_done.connect(self._on_worker_done)
         db.add_local_change_listener(self._on_local_change)
@@ -64,7 +69,8 @@ class SyncManager(QObject):
 
     def save_config(self, config: SyncConfig, device_name: str = "") -> None:
         self.engine.save_config(config)
-        self._db.set_sync_meta("preset_disabled", "0")
+        self._db.set_sync_metas({"preset_disabled": "0", "config_source": "manual"})
+        self._auth_failed = False
         if device_name.strip():
             self._db.set_sync_meta("device_name", device_name.strip()[:40])
         self._refresh_idle_state()
@@ -79,7 +85,7 @@ class SyncManager(QObject):
     def start(self) -> None:
         self._apply_timers()
         if self.configured and self.auto_enabled:
-            QTimer.singleShot(1200, self.sync_now)
+            QTimer.singleShot(1200, self._auto_sync)
             if self.preset_applied:
                 event_bus.toast_requested.emit("已自动连接云同步服务器，正在同步…", "info")
 
@@ -93,9 +99,13 @@ class SyncManager(QObject):
     # ── 触发 ────────────────────────────────
 
     def _on_local_change(self) -> None:
-        if self.configured and self.auto_enabled:
+        if self.configured and self.auto_enabled and not self._auth_failed:
             self._debounce.start(self.DEBOUNCE_MS)
         self.status_changed.emit()
+
+    def _auto_sync(self) -> None:
+        if not self._auth_failed:
+            self.sync_now()
 
     def sync_now(self) -> None:
         if not self.configured:
@@ -123,7 +133,12 @@ class SyncManager(QObject):
         if error is not None:
             self.state = "error"
             self.message = str(error)
+            if isinstance(error, SyncAuthError):
+                self._auth_failed = True
+                self.message = "同步密钥不正确，已暂停自动同步。请更新内置配置，或在“更换服务器”中重新填写"
         else:
+            self._auth_failed = False
+            self._invalid = list(result.invalid)
             self.state = "ok"
             self.message = result.summary
             if result.records_changed:
@@ -142,7 +157,8 @@ class SyncManager(QObject):
         self._periodic.stop()
         had_pending = self._debounce.isActive() or (self.configured and self._db.count_pending_changes() > 0)
         self._debounce.stop()
-        if self.configured and self.auto_enabled and had_pending and not (self._thread and self._thread.is_alive()):
+        if (self.configured and self.auto_enabled and had_pending and not self._auth_failed
+                and not (self._thread and self._thread.is_alive())):
             self._thread = threading.Thread(target=self._run_quietly, name="sync-exit", daemon=True)
             self._thread.start()
         if self._thread is not None:
@@ -174,7 +190,11 @@ class SyncManager(QObject):
         if self.state == "busy":
             return "正在同步…", f"上次 {last}" if last else "首次同步", "busy"
         if self.state == "error":
-            return "同步失败", self.message, "error"
+            return ("同步密钥不正确" if self._auth_failed else "同步失败"), self.message, "error"
+        if self._invalid:
+            date, reason = self._invalid[0]
+            more = f" 等 {len(self._invalid)} 条" if len(self._invalid) > 1 else ""
+            return "部分记录无法同步", f"{date}{more}：{reason}", "error"
         detail = f"上次 {last}" if last else "尚未同步"
         if pending:
             detail += f" · {pending} 项待上传"

@@ -150,6 +150,7 @@ object FieldConfig {
     /** 检查新分类名，返回问题说明；没有问题时返回空字符串。 */
     fun nameProblem(name: String, existing: Set<String>): String = when {
         name.isEmpty() -> "名称不能为空。"
+        name.length > 100 -> "名称太长，最多 100 个字。"
         name in existing -> "分类「$name」已存在，一级和二级分类之间也不能重名。"
         !isFormulaIdentifier(name) -> "名称只能包含中文、字母、数字和下划线，且不能以数字开头，否则无法在利润公式中引用。"
         else -> ""

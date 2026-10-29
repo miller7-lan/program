@@ -8,6 +8,8 @@ core/sync_preset.py
   2. 打包时放入的 assets/sync_preset.txt（本地自行打包时可用，同样不提交）
 
 用户在设置里主动“断开”后不再自动套用，直到重新连接。
+密钥轮换：服务器换了密钥后，只需替换 exe 旁边的 ProfitHelper-sync.txt（或安装新版安卓包），
+程序下次启动会自动换用新配置；用户手动填写的连接不会被覆盖。
 """
 
 from __future__ import annotations
@@ -34,14 +36,29 @@ def find_preset_code() -> str | None:
 
 
 def apply_preset_if_needed(engine: SyncEngine) -> bool:
-    """尚未设置同步、且用户没有主动断开时，自动套用内置配置。返回是否套用了。"""
-    if engine.is_configured() or engine.db.get_sync_meta("preset_disabled") == "1":
+    """
+    套用内置配置，返回是否套用了：
+      - 尚未设置同步 → 套用
+      - 当前连接来自内置配置、而内置配置已更新（例如轮换了密钥）→ 换用新配置
+      - 用户手动填写过、或主动断开过 → 不动
+    """
+    db = engine.db
+    if db.get_sync_meta("preset_disabled") == "1":
         return False
     code = find_preset_code()
     if not code:
         return False
     try:
-        engine.save_config(parse_connection_code(code))
+        preset = parse_connection_code(code)
     except SyncError:
         return False
+    current = engine.load_config()
+    if current.is_complete:
+        if (current.server_url, current.token, current.fallback_ip) == (preset.server_url, preset.token, preset.fallback_ip):
+            return False
+        source = db.get_sync_meta("config_source")
+        if source == "manual" or (source == "" and current.server_url != preset.server_url):
+            return False
+    engine.save_config(preset)
+    db.set_sync_meta("config_source", "preset")
     return True

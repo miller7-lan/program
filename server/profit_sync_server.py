@@ -1291,12 +1291,16 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "import":
         config = load_config(args.config)
         store = LedgerStore(Path(config["data_dir"]) / "ledger.db")
+        backup_dir, keep = Path(config["data_dir"]) / "backups", int(config.get("backup_keep", 30))
         try:
-            before = store.backup(Path(config["data_dir"]) / "backups", int(config.get("backup_keep", 30)))
+            before = store.backup(backup_dir, keep)
             summary = import_desktop_db(store, args.file, replace=args.replace)
+            # 导入后立即再备份一次：否则“每日备份”要等 24 小时后才会包含刚导入的数据
+            after = store.backup(backup_dir, keep)
         finally:
             store.close()
         summary["backup_before_import"] = before.name
+        summary["backup_after_import"] = after.name
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 1 if summary["invalid"] or summary["rejected"] else 0
     return 0

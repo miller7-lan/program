@@ -82,6 +82,8 @@ def field_name_problem(name: str, existing: set[str]) -> str:
     """检查新分类名，返回问题说明；没有问题时返回空字符串。"""
     if not name:
         return "名称不能为空。"
+    if len(name) > 100:
+        return "名称太长，最多 100 个字。"
     if name in existing:
         return f"分类「{name}」已存在，一级和二级分类之间也不能重名。"
     if not is_formula_identifier(name):

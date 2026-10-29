@@ -27,6 +27,7 @@ from __future__ import annotations
 import contextlib
 import datetime as _dt
 import json
+import re
 import sqlite3
 import threading
 import time
@@ -47,6 +48,11 @@ SYNCED_CONFIG_KEYS = ("custom_field_tree", "custom_fields", "profit_formula")
 # 升级前已有数据的“修改时间”标记：比任何真实修改都旧，冲突时让位于真实修改
 LEGACY_MODIFIED_AT = 1
 
+# 与同步服务器的限制保持一致，超出的数据无法上传
+NOTE_MAX_CHARS = 4000
+NAME_MAX_CHARS = 100
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
 _SYNC_TABLES = ("SyncRecordState", "SyncMeta")
 
 
@@ -60,6 +66,17 @@ def _clean_number(value: Any) -> float:
     except (TypeError, ValueError):
         return 0.0
     return number if number == number and abs(number) != float("inf") else 0.0
+
+
+def is_valid_date(text: str) -> bool:
+    """同步与导入要求的日期格式：YYYY-MM-DD 且是真实存在的日期。"""
+    if not isinstance(text, str) or not _DATE_RE.match(text):
+        return False
+    try:
+        _dt.date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
 
 
 def _json_dict(text: str | None) -> dict:
@@ -333,6 +350,8 @@ class DatabaseManager:
 
             records = []
             for row in record_rows:
+                if not is_valid_date(str(row["date"])):
+                    raise ValueError(f"导入文件中有无效日期：{row['date']}（应为 YYYY-MM-DD），未做任何修改。")
                 raw_data = row["raw_data"] or "{}"
                 try:
                     json.loads(raw_data)
@@ -481,6 +500,12 @@ class DatabaseManager:
             if self._meta_get("settings_dirty") == "1":
                 count += 1
         return int(count)
+
+    def invalid_dirty_dates(self) -> list[str]:
+        """待上传记录中日期格式不正确的（只可能来自外部导入的旧数据），这些记录不能上传。"""
+        with self._lock:
+            rows = self._conn.execute("SELECT date FROM SyncRecordState WHERE dirty = 1").fetchall()
+        return [row["date"] for row in rows if not is_valid_date(row["date"])]
 
     def collect_dirty_records(self, limit: int, exclude: set[str] | None = None) -> list[dict]:
         """取出待上传的记录（含删除标记），按修改时间排序。"""
@@ -710,6 +735,11 @@ class DatabaseManager:
         stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         target = self.db_path.with_name(f"{self.db_path.stem}.before-sync-{stamp}.db")
         self.backup_copy(target)
+        # 备份只用于找回数据，去掉同步密钥，避免备份文件被拷走时泄露
+        with contextlib.closing(sqlite3.connect(str(target))) as conn:
+            with conn:
+                conn.execute("DELETE FROM SyncMeta WHERE key = 'token'")
+            conn.execute("VACUUM")
         self.set_sync_meta("pre_sync_backup", target.name)
         return target
 

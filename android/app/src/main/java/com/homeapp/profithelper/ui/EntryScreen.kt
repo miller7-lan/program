@@ -173,6 +173,21 @@ fun EntryScreen(app: ProfitApp, entry: EntryController) {
         ) { DatePicker(state = state, showModeToggle = false) }
     }
 
+    if (entry.conflictPending) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { entry.resolveConflict(null) },
+            title = { Text("这一天刚被其他设备修改过") },
+            text = { Text("${entry.dateTitle()} 在你编辑期间已通过云同步更新。继续保存会用你现在的输入覆盖它（被覆盖的版本仍保留在服务器上）。") },
+            confirmButton = { TextButton(onClick = { entry.resolveConflict(true) }) { Text("仍然保存", color = Palette.Danger) } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { entry.resolveConflict(null) }) { Text("取消", color = Palette.Text2) }
+                    TextButton(onClick = { entry.resolveConflict(false) }) { Text("载入最新数据") }
+                }
+            },
+        )
+    }
+
     entry.pendingDate?.let {
         UnsavedChangesDialog(
             dateLabel = entry.dateTitle(),
