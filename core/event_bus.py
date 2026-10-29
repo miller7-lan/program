@@ -21,12 +21,16 @@ class EventBus(QObject):
     """全局信号总线（单例）。
 
     信号说明：
-        data_changed   — 每日记录增/删/改 时发射，触发图表和看板刷新
-        config_changed — 用户更新自定义字段或公式配置时发射
+        data_changed          — 每日记录增/删/改 时发射（包括云同步拉取到的变化），触发图表和看板刷新
+        config_changed        — 用户更新自定义字段或公式配置时发射（包括云同步拉取到的变化）
+        edit_date_requested   — 请求切换到录入页并打开指定日期（参数：'2024-01-15'）
+        toast_requested       — 在窗口底部显示一条非阻塞提示（参数：文本, 语气 info/success/error）
     """
 
     data_changed = Signal()    # 数据库记录变化
     config_changed = Signal()  # 配置项变化（字段列表 / 公式）
+    edit_date_requested = Signal(str)
+    toast_requested = Signal(str, str)
 
 
 # ──────────────────────────────────────────

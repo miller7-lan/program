@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart Profit Helper sync server to load renewed TLS certificate
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl try-restart profit-helper.service

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily restart of Profit Helper sync server (TLS certificate reload)
+
+[Timer]
+OnCalendar=*-*-* 04:40:00 Asia/Shanghai
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

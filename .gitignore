@@ -13,3 +13,11 @@ family_ledger.db
 # OS
 .DS_Store
 Thumbs.db
+
+# Windows 打包与本地运行产生的文件
+.venv-win/
+build_windows_exe.log
+family_ledger.lock
+family_ledger.before-sync-*.db
+smoke-test.txt
+screenshots/

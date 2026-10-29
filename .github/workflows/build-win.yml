@@ -22,16 +22,39 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Run tests
+      run: python -m unittest discover -s tests -v
+
     - name: Build with PyInstaller
       run: |
         pyinstaller --noconfirm --clean --windowed --onefile --name "ProfitHelper" --icon assets/app_icon.ico --add-data "assets;assets" main.py
 
+    - name: Smoke test EXE
+      shell: pwsh
+      run: |
+        $p = Start-Process -FilePath "dist\ProfitHelper.exe" -ArgumentList "--smoke-test" -PassThru
+        if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw "EXE 没有在 120 秒内退出" }
+        Get-Content dist\smoke-test.txt
+        if ($p.ExitCode -ne 0) { throw "EXE 自检失败，退出码 $($p.ExitCode)" }
+        Remove-Item dist\smoke-test.txt, dist\family_ledger.db, dist\family_ledger.lock -ErrorAction SilentlyContinue
+
+    - name: Render UI screenshots (demo data)
+      run: |
+        python tools/preview_screenshots.py --out screenshots --size 1280x720 --scale 1.0
+        python tools/preview_screenshots.py --out screenshots --size 1100x620 --scale 1.25
+
     - name: Create Zip Archive
       run: |
-         powershell Compress-Archive -Path "dist\ProfitHelper.exe" -DestinationPath "ProfitHelper_Windows_v1.0.zip"
+        powershell Compress-Archive -Path "dist\ProfitHelper.exe" -DestinationPath "ProfitHelper_Windows_v1.1.zip"
 
-    - name: Upload Artifact
+    - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
-        name: BusinessHelper_Windows
-        path: ProfitHelper_Windows_v1.0.zip
+        name: ProfitHelper_Windows
+        path: ProfitHelper_Windows_v1.1.zip
+
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v4
+      with:
+        name: ProfitHelper_Windows_Screenshots
+        path: screenshots/

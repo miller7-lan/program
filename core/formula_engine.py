@@ -23,7 +23,16 @@ core/formula_engine.py
 """
 
 import ast
+import unicodedata
 from typing import Any
+
+# 中文输入法常见的全角 / 特殊符号 → 公式可识别的半角符号（NFKC 处理不到的部分）
+_EXTRA_TRANSLATIONS = str.maketrans({"×": "*", "÷": "/", "−": "-", "。": ".", "\n": " ", "\r": " ", "\t": " "})
+
+
+def normalize_formula(formula: str) -> str:
+    """统一公式写法：全角括号 / 运算符 / 数字转半角，换行转空格（安卓端做同样的处理）。"""
+    return unicodedata.normalize("NFKC", formula).translate(_EXTRA_TRANSLATIONS)
 
 
 class FormulaError(Exception):
@@ -49,6 +58,19 @@ _ALLOWED_NODE_TYPES = (
 )
 
 
+def _describe_syntax_error(msg: str) -> str:
+    """把 Python 的英文语法错误换成中文说明（安卓端使用同样的说法）。"""
+    if "was never closed" in msg:
+        return "有括号没有闭合"
+    if "unmatched" in msg or "does not match" in msg:
+        return "多了右括号"
+    if "leading zeros" in msg:
+        return "数字不能以 0 开头"
+    if "invalid decimal literal" in msg or "invalid digit" in msg or "invalid hexadecimal" in msg:
+        return "数字后面缺少运算符"
+    return "写法有误，请检查运算符和括号"
+
+
 class FormulaEngine:
     """安全公式引擎。"""
 
@@ -71,7 +93,8 @@ class FormulaEngine:
             FormulaError: 公式语法非法、变量未定义或除以零时抛出
         """
         tree = self._parse(formula)
-        return self._eval_node(tree.body, variables)
+        normalized = {unicodedata.normalize("NFKC", str(k)): v for k, v in variables.items()}
+        return self._eval_node(tree.body, normalized)
 
     def validate(self, formula: str) -> tuple[bool, str]:
         """
@@ -110,13 +133,13 @@ class FormulaEngine:
 
     def _parse(self, formula: str) -> ast.Expression:
         """解析公式字符串，返回 AST，并验证节点白名单。"""
-        formula = formula.strip()
+        formula = normalize_formula(formula).strip()
         if not formula:
             raise FormulaError("公式不能为空")
         try:
             tree = ast.parse(formula, mode="eval")
         except SyntaxError as e:
-            raise FormulaError(f"公式语法错误：{e.msg}") from e
+            raise FormulaError(f"公式语法错误：{_describe_syntax_error(e.msg)}") from e
 
         # 检查所有节点是否在白名单内
         for node in ast.walk(tree):

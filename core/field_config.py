@@ -6,6 +6,7 @@ core/field_config.py
 from __future__ import annotations
 
 import json
+import keyword
 from typing import Any
 
 
@@ -70,6 +71,22 @@ def normalize_field_tree(data: Any) -> list[dict[str, Any]]:
         normalized.append({"name": parent_name, "children": child_items})
 
     return normalized
+
+
+def is_formula_identifier(name: str) -> bool:
+    """分类名能否直接写进利润公式：只能由中文、字母、数字、下划线组成，且不能以数字开头。"""
+    return name.isidentifier() and not keyword.iskeyword(name)
+
+
+def field_name_problem(name: str, existing: set[str]) -> str:
+    """检查新分类名，返回问题说明；没有问题时返回空字符串。"""
+    if not name:
+        return "名称不能为空。"
+    if name in existing:
+        return f"分类「{name}」已存在，一级和二级分类之间也不能重名。"
+    if not is_formula_identifier(name):
+        return "名称只能包含中文、字母、数字和下划线，且不能以数字开头，否则无法在利润公式中引用。"
+    return ""
 
 
 def flatten_formula_fields(field_tree: list[dict[str, Any]]) -> list[str]:

@@ -1,16 +1,16 @@
 """
 core/report_engine.py
-报表生成引擎骨架 — 基于 pandas / openpyxl，负责数据聚合与 Excel 导出。
+报表引擎 — 负责看板统计、趋势数据与 Excel 导出，与 UI 层完全解耦。
 
-后续在此模块填充具体业务逻辑，与 UI 层完全解耦。
+只依赖标准库与 openpyxl（不再依赖 pandas / numpy），Win10 打包体积更小、启动更快。
 """
 
 from __future__ import annotations
 
+import datetime as dt
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -20,51 +20,115 @@ from core.field_config import build_formula_variables, load_field_tree_from_json
 if TYPE_CHECKING:
     from core.database import DatabaseManager
 
+WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+
+def weekday_label(date_text: str) -> str:
+    try:
+        return WEEKDAYS[dt.date.fromisoformat(date_text).weekday()]
+    except ValueError:
+        return ""
+
+
+def load_field_tree(db: "DatabaseManager") -> list[dict]:
+    return load_field_tree_from_json(
+        db.get_config("custom_field_tree", "") or db.get_config("custom_fields", '["营业额", "成本"]')
+    )
+
 
 class ReportEngine:
-    """基于 pandas 的报表生成引擎。"""
+    """看板统计与报表导出。"""
 
     def __init__(self, db: "DatabaseManager"):
         self._db = db
 
-    def generate_daily_df(self, start_date: str, end_date: str) -> pd.DataFrame:
-        records = self._db.get_range(start_date, end_date)
-        if not records:
-            return pd.DataFrame(columns=["date", "total_profit"])
-        df = pd.DataFrame(records)
-        df["date"] = pd.to_datetime(df["date"])
-        df = df[["date", "total_profit"]].sort_values("date")
-        return df.reset_index(drop=True)
+    # ─────────────────────────────────────────────
+    # 看板数据
+    # ─────────────────────────────────────────────
 
-    def generate_monthly_df(self, year: int) -> pd.DataFrame:
-        start = f"{year}-01-01"
-        end = f"{year}-12-31"
-        df = self.generate_daily_df(start, end)
-        if df.empty:
-            return pd.DataFrame(columns=["month", "total_profit"])
-        df["month"] = df["date"].dt.month
-        monthly = df.groupby("month", as_index=False)["total_profit"].sum()
-        return monthly
+    def daily_series(self, days: int = 30, today: dt.date | None = None) -> list[tuple[dt.date, float | None]]:
+        """最近 days 天的每日利润，未录入的日期为 None。"""
+        today = today or dt.date.today()
+        start = today - dt.timedelta(days=days - 1)
+        records = {r["date"]: r for r in self._db.get_range(start.isoformat(), today.isoformat())}
+        series = []
+        for offset in range(days):
+            day = start + dt.timedelta(days=offset)
+            record = records.get(day.isoformat())
+            series.append((day, record["total_profit"] if record else None))
+        return series
 
-    def generate_yearly_summary(self) -> pd.DataFrame:
-        records = self._db.get_all_records()
-        if not records:
-            return pd.DataFrame(columns=["year", "total_profit"])
-        df = pd.DataFrame(records)
-        df["date"] = pd.to_datetime(df["date"])
-        df["year"] = df["date"].dt.year
-        yearly = df.groupby("year", as_index=False)["total_profit"].sum()
-        return yearly
+    def monthly_series(self, months: int = 12, today: dt.date | None = None) -> list[tuple[int, int, float, int]]:
+        """最近 months 个月的 (年, 月, 利润合计, 记录天数)。"""
+        today = today or dt.date.today()
+        year, month = today.year, today.month
+        keys: list[tuple[int, int]] = []
+        for _ in range(months):
+            keys.append((year, month))
+            month -= 1
+            if month == 0:
+                year, month = year - 1, 12
+        keys.reverse()
+
+        start = dt.date(keys[0][0], keys[0][1], 1)
+        totals = {key: [0.0, 0] for key in keys}
+        for record in self._db.get_range(start.isoformat(), today.isoformat()):
+            day = dt.date.fromisoformat(record["date"])
+            bucket = totals.get((day.year, day.month))
+            if bucket is not None:
+                bucket[0] += float(record["total_profit"] or 0.0)
+                bucket[1] += 1
+        return [(y, m, totals[(y, m)][0], totals[(y, m)][1]) for y, m in keys]
+
+    def get_summary_data(self, today: dt.date | None = None) -> dict:
+        today = today or dt.date.today()
+        today_str = today.isoformat()
+        yesterday_str = (today - dt.timedelta(days=1)).isoformat()
+
+        year_records = self._db.get_range(today.replace(month=1, day=1).isoformat(), today_str)
+        by_date = {r["date"]: r for r in year_records}
+        yesterday_record = by_date.get(yesterday_str) or self._db.get_record(yesterday_str)
+        month_prefix = today_str[:7]
+        month_records = [r for r in year_records if r["date"].startswith(month_prefix)]
+
+        today_record = by_date.get(today_str)
+        month_total = self._sum_profit(month_records)
+        year_total = self._sum_profit(year_records)
+        best = max(month_records, key=lambda r: r["total_profit"], default=None)
+
+        return {
+            "today": today_record["total_profit"] if today_record else 0.0,
+            "today_recorded": today_record is not None,
+            "yesterday": yesterday_record["total_profit"] if yesterday_record else None,
+            "month": month_total,
+            "month_days": len(month_records),
+            "month_avg": month_total / len(month_records) if month_records else 0.0,
+            "month_best": (best["date"], best["total_profit"]) if best else None,
+            "year": year_total,
+            "year_days": len(year_records),
+            "year_avg": year_total / len(year_records) if year_records else 0.0,
+        }
+
+    @staticmethod
+    def range_summary(records: list[dict]) -> dict:
+        profits = [float(r["total_profit"] or 0.0) for r in records]
+        total = sum(profits)
+        return {
+            "days": len(profits),
+            "total": total,
+            "avg": total / len(profits) if profits else 0.0,
+            "max": max(profits) if profits else 0.0,
+            "min": min(profits) if profits else 0.0,
+        }
+
+    # ─────────────────────────────────────────────
+    # Excel 导出
+    # ─────────────────────────────────────────────
 
     def export_to_excel(self, export_path: str | Path, start_date: str, end_date: str) -> Path:
         export_path = Path(export_path)
         records = self._db.get_range(start_date, end_date)
-        field_tree = load_field_tree_from_json(
-            self._db.get_config(
-                "custom_field_tree",
-                self._db.get_config("custom_fields", '["营业额", "成本"]'),
-            )
-        )
+        field_tree = load_field_tree(self._db)
 
         workbook = Workbook()
         sheet = workbook.active
@@ -112,34 +176,11 @@ class ReportEngine:
         workbook.save(export_path)
         return export_path
 
-    def get_summary_data(self) -> dict[str, float]:
-        import datetime
-
-        now = datetime.date.today()
-        today_str = now.strftime("%Y-%m-%d")
-
-        today_rec = self._db.get_record(today_str)
-        today_val = today_rec["total_profit"] if today_rec else 0.0
-
-        month_start = now.replace(day=1).strftime("%Y-%m-%d")
-        month_records = self._db.get_range(month_start, today_str)
-        month_val = self._sum_profit(month_records)
-
-        year_start = now.replace(month=1, day=1).strftime("%Y-%m-%d")
-        year_records = self._db.get_range(year_start, today_str)
-        year_val = self._sum_profit(year_records)
-
-        return {
-            "today": today_val,
-            "month": month_val,
-            "year": year_val,
-        }
-
     def _group_records(self, records: list[dict]) -> list[tuple[int, list[tuple[int, list[dict]]]]]:
         grouped: dict[int, dict[int, list[dict]]] = {}
         for record in records:
-            dt = pd.to_datetime(record["date"])
-            grouped.setdefault(dt.year, {}).setdefault(dt.month, []).append(record)
+            day = dt.date.fromisoformat(record["date"])
+            grouped.setdefault(day.year, {}).setdefault(day.month, []).append(record)
 
         return [
             (year, [(month, grouped[year][month]) for month in sorted(grouped[year])])
@@ -239,7 +280,7 @@ class ReportEngine:
                 rows.append({
                     "parent": parent_name,
                     "child": "",
-                    "amount": float(stored_value or 0.0),
+                    "amount": float(stored_value or 0.0) if not isinstance(stored_value, dict) else 0.0,
                 })
 
         for key, value in raw_data.items():
@@ -269,7 +310,8 @@ class ReportEngine:
             cell.fill = PatternFill("solid", fgColor=fill)
             cell.alignment = Alignment(horizontal="left", vertical="center")
 
-    def _sum_profit(self, records) -> float:
+    @staticmethod
+    def _sum_profit(records) -> float:
         return sum(float(record.get("total_profit", 0.0) or 0.0) for record in records)
 
     def _set_column_widths(self, sheet) -> None:

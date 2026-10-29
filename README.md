@@ -1,118 +1,96 @@
 # 利润助手 💰
 
-本地极简家庭利润记账软件。本地运行 · 数据不上云 · 操作极简。
+家庭利润记账软件：Win10 桌面端 + 安卓手机端，通过自建的同步服务共用同一份账本，离线也能记账，联网后自动同步。
 
-## 技术栈
+## 组成
 
-| 模块 | 库 |
-|------|----|
-| GUI | PySide6 |
-| 本地数据库 | SQLite3 (family_ledger.db) |
-| 数据处理 | pandas + openpyxl |
-| 图表 | matplotlib |
-| 安全公式 | ast (内置标准库) |
-| 打包 | PyInstaller |
+| 部分 | 技术 | 说明 |
+|------|------|------|
+| Win10 桌面端 | PySide6 + SQLite + openpyxl | 录入、看板、历史、Excel 分级报表、分类与公式设置 |
+| 安卓端 | Kotlin + Jetpack Compose | 与桌面端相同的分类、公式（同一套规则，测试逐条比对）、报表与导入导出 |
+| 同步服务 | Python 标准库 + SQLite | `server/profit_sync_server.py`，无第三方依赖，HTTPS + 同步密钥 |
 
 ## 项目结构
 
 ```
-利润助手/
-├── main.py              # 程序入口
-├── requirements.txt     # 依赖清单
-├── family_ledger.db     # 数据库（首次运行自动生成）
+├── main.py                 # 桌面端入口（--smoke-test 为打包自检）
 ├── core/
-│   ├── database.py      # SQLite DAO 层
-│   ├── event_bus.py     # 全局信号总线
-│   ├── formula_engine.py# 安全公式解析引擎
-│   └── report_engine.py # pandas 报表生成
-├── ui/
-│   ├── main_window.py   # 主窗口（导航栏 + 内容区）
-│   ├── dashboard_view.py# 看板页
-│   ├── entry_view.py    # 录入页
-│   ├── history_view.py  # 历史记录页
-│   └── settings_view.py # 设置页
-└── assets/
-    ├── style.qss        # 深色主题样式表
-    ├── app_icon.png     # 运行时应用图标
-    ├── app_icon.ico     # Windows 打包图标
-    └── app_icon.icns    # macOS 打包图标
+│   ├── database.py         # SQLite DAO 层（含同步元数据）
+│   ├── sync_client.py      # 云同步客户端（不依赖 Qt）
+│   ├── formula_engine.py   # 安全公式解析引擎（ast 白名单）
+│   ├── field_config.py     # 一级 / 二级分类工具
+│   ├── report_engine.py    # 看板统计与 Excel 导出
+│   └── event_bus.py        # 全局信号总线
+├── ui/                     # 桌面端界面（看板 / 录入 / 历史 / 设置）
+├── assets/                 # 样式表、图标（由 tools/make_icons.py 生成）
+├── server/                 # 同步服务与部署脚本（见 server/deploy/README.md）
+├── android/                # 安卓端 Gradle 工程
+├── tests/                  # 服务端与桌面端同步测试
+└── tools/                  # 图标生成、公式测试向量、界面截图
 ```
 
-## 快速开始（Mac 开发环境）
+## 快速开始（桌面端开发）
 
 ```bash
-cd 利润助手
-
-# 1. 创建并激活虚拟环境
 python3 -m venv .venv
 source .venv/bin/activate
-
-# 2. 安装依赖
 pip install -r requirements.txt
-
-# 3. 运行
 python main.py
 ```
 
+运行测试：
+
+```bash
+python -m unittest discover -s tests
+```
+
+## 云同步
+
+1. 在服务器上部署同步服务（见 [server/deploy/README.md](server/deploy/README.md)），得到服务器地址和同步密钥。
+2. 桌面端：设置 → 云同步，粘贴 `PH1-` 开头的连接码，点“保存并同步”。
+3. 点“复制连接码给手机”，在安卓端 设置 → 云同步 中粘贴即可。
+
+同步规则：
+
+- 每天的记录独立同步；同一天在两台设备上都修改过时，以最后修改的为准，被覆盖的版本保留在服务器的历史表中。
+- 分类结构和利润公式作为一份设置一起同步；“历史起始日期”等界面偏好只保存在本机。
+- 首次同步前，桌面端会在数据文件旁自动备份 `family_ledger.before-sync-*.db`。
+- 导出的账本不包含同步密钥，可在桌面端和安卓端互相导入。
+
 ## 打包为 Windows .exe
 
-> **注意**：必须在 Windows 10/11 机器（或 Mac 虚拟机中的 Windows）上执行以下命令。
-> 在 macOS 上 PyInstaller 只能打出 macOS 版本。
+推送到 GitHub 后，Actions（`Build Windows EXE`）会自动：运行测试 → 打包 → 用 `--smoke-test` 启动 exe 自检 → 在 Windows 上截取界面图，产物为 `ProfitHelper_Windows` 与 `ProfitHelper_Windows_Screenshots`。
 
-### 双击一键打包
-
-项目根目录已经提供：
+也可以在 Windows 10/11 上双击 `build_windows_exe.bat` 本地打包，或手动执行：
 
 ```bash
-build_windows_exe.bat
-```
-
-在 Windows 电脑上直接双击它即可自动完成：
-
-- 创建 `.venv-win` 虚拟环境
-- 使用清华镜像安装依赖，减少掉线和下载失败
-- 自动清理旧的 `build/`、`dist/`
-- 自动生成 `dist/ProfitHelper.exe`
-
-如果电脑还没有 Python 3.11+，脚本会先提示安装。
-如果打包失败，脚本不会闪退，并会生成 `build_windows_exe.log` 方便排查。
-
-### 手动命令行打包
-
-```bash
-# 在 Windows 机器上：
 python -m venv .venv-win
 .venv-win\Scripts\activate
-python -m pip install --upgrade pip setuptools wheel -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
 python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
-python -m PyInstaller --noconfirm --clean --windowed --onefile ^
-  --name "ProfitHelper" ^
-  --icon assets/app_icon.ico ^
-  --add-data "assets;assets" ^
-  main.py
+python -m PyInstaller --noconfirm --clean --windowed --onefile --name "ProfitHelper" --icon assets/app_icon.ico --add-data "assets;assets" main.py
 ```
 
-生成的 `.exe` 位于 `dist/ProfitHelper.exe`，可直接复制到目标电脑运行，无需安装 Python。
+生成的 `dist/ProfitHelper.exe` 可直接复制到目标电脑运行；首次运行会在 exe 同级目录生成 `family_ledger.db`，旧版本的账本放在同一目录会自动升级。
 
-如果在 macOS 打包 `.app`，可使用：
+## 安卓端
+
+需要 JDK 17+ 与 Android SDK（compileSdk 36）。在 `android/local.properties` 中可选配置（该文件不会提交）：
+
+```properties
+sdk.dir=/path/to/Android/sdk
+profitHelper.defaultServerUrl=https://example.com:28443   # 设置页默认填好的服务器地址
+profitHelper.defaultFallbackIp=203.0.113.10                # 域名解析失败时直接连接的 IP
+profitHelper.keystoreProperties=/path/to/keystore.properties # 正式版签名（storeFile/storePassword/keyAlias/keyPassword）
+```
 
 ```bash
-pyinstaller --windowed --onedir \
-  --icon assets/app_icon.icns \
-  --add-data "assets:assets" \
-  main.py
+cd android
+./gradlew testDebugUnitTest   # 公式引擎与桌面端逐条比对
+./gradlew assembleRelease     # 生成 app/build/outputs/apk/release/app-release.apk
 ```
 
 ## 数据说明
 
-- 数据存储在 `family_ledger.db`（SQLite 单文件），位于程序同级目录
-- 每日记录以 JSON 格式存储自定义字段，支持随时增减账目类型
-- 利润计算公式可在设置页自由配置，例如 `营业额 - 成本` 或 `(营业额 - 成本) * 0.9`
-- Windows 打包后的 `.exe` 首次运行时，也会在 `exe` 同级目录自动生成 `family_ledger.db`
-
-## 架构亮点
-
-- **MVC 分层**：UI / DAO / 业务逻辑完全解耦
-- **响应式更新**：全局 EventBus 信号总线，数据变更后所有视图自动刷新
-- **跨平台路径**：所有路径拼接使用 `pathlib.Path`，Windows/Mac 均兼容
-- **安全公式引擎**：基于 `ast` 白名单，拒绝代码注入，支持中文变量名
+- 每日记录以 JSON 存储各分类金额，支持随时增减一级 / 二级分类
+- 利润公式可在设置页自由配置，例如 `营业额 - 成本` 或 `(营业额 - 成本) * 0.9`；全角括号和 × ÷ 也能识别
+- 录入金额时可以直接输入算式，例如 `120+35`
