@@ -207,6 +207,27 @@ class DesktopSyncTests(unittest.TestCase):
             engine.sync()
         self.assertTrue(self.db_b.get_sync_meta("last_error"))
 
+    def test_builtin_preset_applies_until_user_disconnects(self):
+        import core.sync_preset as preset
+
+        preset_file = self.tmp / "利润助手同步配置.txt"
+        preset_file.write_text("说明文字\n" + make_connection_code(self.server.url, TOKEN) + "\n", encoding="utf-8")
+        original = preset.data_file_path
+        preset.data_file_path = lambda name: self.tmp / name
+        try:
+            fresh = DatabaseManager(self.tmp / "fresh.db")
+            engine = SyncEngine(fresh, app_version="test")
+            self.assertTrue(preset.apply_preset_if_needed(engine))
+            self.assertEqual(engine.load_config().token, TOKEN)
+            self.assertEqual(engine.sync().pulled, 0)
+            self.assertFalse(preset.apply_preset_if_needed(engine))  # 已设置过，不重复套用
+            fresh.forget_sync_server()
+            fresh.set_sync_meta("preset_disabled", "1")
+            self.assertFalse(preset.apply_preset_if_needed(engine))  # 用户主动断开后不再自动连接
+            fresh.close()
+        finally:
+            preset.data_file_path = original
+
     def test_connection_code_round_trip(self):
         code = make_connection_code("example.com:28443", TOKEN, "203.0.113.7")
         config = parse_connection_code(code)

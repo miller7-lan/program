@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 由 tools/make_icons.py 生成，请勿手改 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.082" android:scaleY="0.082" android:translateX="11.770" android:translateY="13.246">
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.55" android:pathData="M280,560 H332 A44,44 0 0 1 376,604 V744 A44,44 0 0 1 332,788 H280 A44,44 0 0 1 236,744 V604 A44,44 0 0 1 280,560 Z" />
+        <path android:fillColor="#FFFFFF" android:fillAlpha="0.78" android:pathData="M486,452 H538 A44,44 0 0 1 582,496 V744 A44,44 0 0 1 538,788 H486 A44,44 0 0 1 442,744 V496 A44,44 0 0 1 486,452 Z" />
+        <path android:fillColor="#FFFFFF" android:fillAlpha="1.0" android:pathData="M692,330 H744 A44,44 0 0 1 788,374 V744 A44,44 0 0 1 744,788 H692 A44,44 0 0 1 648,744 V374 A44,44 0 0 1 692,330 Z" />
+        <path android:strokeColor="#5B4FE0" android:strokeWidth="100" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M228 540 L400 400 L520 468 L723 286" />
+        <path android:fillColor="#5B4FE0" android:strokeColor="#5B4FE0" android:strokeWidth="60" android:strokeLineJoin="round" android:pathData="M812 206 L771 340 L675 232 Z" />
+        <path android:strokeColor="#FFC24B" android:strokeWidth="58" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M228 540 L400 400 L520 468 L723 286" />
+        <path android:fillColor="#FFC24B" android:strokeColor="#FFC24B" android:strokeWidth="22" android:strokeLineJoin="round" android:pathData="M812 206 L771 340 L675 232 Z" />
+    </group>
+</vector>

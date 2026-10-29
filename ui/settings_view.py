@@ -258,8 +258,8 @@ class SettingsView(QWidget):
         head = QHBoxLayout()
         head.addLayout(section_header(
             "云同步",
-            "Win10 电脑与安卓手机共用同一份账本。同一天在两台设备上都改过时，以最后修改的为准，"
-            "被覆盖的版本会保留在服务器上。",
+            "已内置同步服务器，Win10 电脑与安卓手机自动共用同一份账本。同一天在两台设备上都改过时，"
+            "以最后修改的为准，被覆盖的版本会保留在服务器上。",
         ), 1)
         layout.addLayout(head)
 
@@ -281,6 +281,20 @@ class SettingsView(QWidget):
         status_row.addWidget(self._sync_now_btn)
         layout.addWidget(status)
 
+        self._auto_check = QCheckBox("自动同步（启动时、保存后、每 5 分钟）")
+        self._auto_check.toggled.connect(self._sync.set_auto_enabled)
+        layout.addWidget(self._auto_check)
+
+        self._manual_toggle = make_button("更换服务器（一般不需要）", "ghost", "chevron-right")
+        self._manual_toggle.setCheckable(True)
+        self._manual_toggle.toggled.connect(self._toggle_manual_fields)
+        layout.addWidget(self._manual_toggle, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        self._manual_fields = QWidget()
+        manual = QVBoxLayout(self._manual_fields)
+        manual.setContentsMargins(0, 0, 0, 0)
+        manual.setSpacing(10)
+
         code_row = QHBoxLayout()
         code_row.setSpacing(8)
         self._code_input = QLineEdit()
@@ -290,40 +304,9 @@ class SettingsView(QWidget):
         apply_code = make_button("识别连接码", "", "link")
         apply_code.clicked.connect(self._apply_connection_code)
         code_row.addWidget(apply_code)
-        layout.addLayout(code_row)
+        manual.addLayout(code_row)
 
-        buttons = QHBoxLayout()
-        buttons.setSpacing(8)
-        save_sync = make_button("保存并同步", "primary", "cloud-check")
-        save_sync.clicked.connect(self._save_and_sync)
-        buttons.addWidget(save_sync)
-        self._test_btn = make_button("测试连接", "", "link")
-        self._test_btn.clicked.connect(self._test_connection)
-        buttons.addWidget(self._test_btn)
-        copy_code = make_button("复制连接码给手机", "", "copy")
-        copy_code.clicked.connect(self._copy_connection_code)
-        buttons.addWidget(copy_code)
-        buttons.addStretch()
-        self._auto_check = QCheckBox("自动同步")
-        self._auto_check.setToolTip("启动时、保存后、每 5 分钟自动同步")
-        self._auto_check.toggled.connect(self._sync.set_auto_enabled)
-        buttons.addWidget(self._auto_check)
-        disconnect = make_button("断开", "danger")
-        disconnect.clicked.connect(self._disconnect_sync)
-        buttons.addWidget(disconnect)
-        layout.addLayout(buttons)
-
-        self._test_result = label("", "Hint", wrap=True)
-        self._test_result.setVisible(False)
-        layout.addWidget(self._test_result)
-
-        self._manual_toggle = make_button("手动填写服务器信息", "ghost", "chevron-right")
-        self._manual_toggle.setCheckable(True)
-        self._manual_toggle.toggled.connect(self._toggle_manual_fields)
-        layout.addWidget(self._manual_toggle, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        self._manual_fields = QWidget()
-        form = QFormLayout(self._manual_fields)
+        form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
         form.setHorizontalSpacing(14)
         form.setVerticalSpacing(10)
@@ -353,8 +336,31 @@ class SettingsView(QWidget):
         self._device_input = QLineEdit()
         self._device_input.setPlaceholderText("在服务器上显示的设备名称")
         form.addRow("本机名称", self._device_input)
+        manual.addLayout(form)
+
+        buttons = QHBoxLayout()
+        buttons.setSpacing(8)
+        save_sync = make_button("保存并同步", "primary", "cloud-check")
+        save_sync.clicked.connect(self._save_and_sync)
+        buttons.addWidget(save_sync)
+        self._test_btn = make_button("测试连接", "", "link")
+        self._test_btn.clicked.connect(self._test_connection)
+        buttons.addWidget(self._test_btn)
+        copy_code = make_button("复制连接码", "", "copy")
+        copy_code.clicked.connect(self._copy_connection_code)
+        buttons.addWidget(copy_code)
+        buttons.addStretch()
+        disconnect = make_button("断开", "danger")
+        disconnect.clicked.connect(self._disconnect_sync)
+        buttons.addWidget(disconnect)
+        manual.addLayout(buttons)
+
         self._manual_fields.setVisible(False)
         layout.addWidget(self._manual_fields)
+
+        self._test_result = label("", "Hint", wrap=True)
+        self._test_result.setVisible(False)
+        layout.addWidget(self._test_result)
         return card
 
     def _show_result(self, text: str, tone: str = "Hint") -> None:
@@ -651,6 +657,8 @@ class SettingsView(QWidget):
         self._auto_check.blockSignals(True)
         self._auto_check.setChecked(self._sync.auto_enabled)
         self._auto_check.blockSignals(False)
+        # 没有内置配置、也没有连接过时才自动展开，方便手动填写
+        self._manual_toggle.setChecked(not self._sync.configured)
         self._refresh_sync_status()
 
     def _refresh_sync_status(self) -> None:
@@ -689,7 +697,7 @@ class SettingsView(QWidget):
             return None
         token = self._token_input.text().strip()
         if not url or not token:
-            QMessageBox.warning(self, "信息不完整", "请先粘贴连接码并点“识别连接码”，或在“手动填写服务器信息”中填写。")
+            QMessageBox.warning(self, "信息不完整", "请先粘贴连接码并点“识别连接码”，或在“更换服务器”中填写服务器地址和同步密钥。")
             return None
         return SyncConfig(server_url=url, token=token, fallback_ip=self._ip_input.text().strip())
 
@@ -741,8 +749,8 @@ class SettingsView(QWidget):
         QMessageBox.information(
             self,
             "连接码已复制",
-            "连接码已复制到剪贴板。\n\n可以通过微信“文件传输助手”发到自己的手机，"
-            "在安卓端“设置 → 云同步”中粘贴即可。\n连接码包含同步密钥，请不要发给其他人。",
+            "连接码已复制到剪贴板。\n\n安卓端已内置服务器，一般不需要；如需手动连接其他设备，"
+            "可在安卓端“设置 → 云同步 → 更换服务器”中粘贴。\n连接码包含同步密钥，请不要发给其他人。",
         )
 
     def _disconnect_sync(self) -> None:

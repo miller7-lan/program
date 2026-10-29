@@ -17,6 +17,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from core.event_bus import event_bus
 from core.sync_client import SyncConfig, SyncEngine, SyncError, describe_time
+from core.sync_preset import apply_preset_if_needed
 
 
 class SyncManager(QObject):
@@ -44,6 +45,7 @@ class SyncManager(QObject):
 
         self._worker_done.connect(self._on_worker_done)
         db.add_local_change_listener(self._on_local_change)
+        self.preset_applied = apply_preset_if_needed(self.engine)
         self._refresh_idle_state()
 
     # ── 配置 ────────────────────────────────
@@ -62,6 +64,7 @@ class SyncManager(QObject):
 
     def save_config(self, config: SyncConfig, device_name: str = "") -> None:
         self.engine.save_config(config)
+        self._db.set_sync_meta("preset_disabled", "0")
         if device_name.strip():
             self._db.set_sync_meta("device_name", device_name.strip()[:40])
         self._refresh_idle_state()
@@ -69,6 +72,7 @@ class SyncManager(QObject):
 
     def disconnect(self) -> None:
         self._db.forget_sync_server()
+        self._db.set_sync_meta("preset_disabled", "1")  # 主动断开后不再自动套用内置配置
         self._refresh_idle_state()
         self._apply_timers()
 
@@ -76,6 +80,8 @@ class SyncManager(QObject):
         self._apply_timers()
         if self.configured and self.auto_enabled:
             QTimer.singleShot(1200, self.sync_now)
+            if self.preset_applied:
+                event_bus.toast_requested.emit("已自动连接云同步服务器，正在同步…", "info")
 
     def _apply_timers(self) -> None:
         if self.configured and self.auto_enabled:

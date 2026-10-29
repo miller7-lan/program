@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import sys
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QLocale, Qt
 from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication
 
@@ -36,6 +36,8 @@ FONT_FAMILIES = ["Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe 
 
 def apply_app_theme(app: QApplication) -> None:
     """Fusion 风格 + 固定浅色调色板：Win10 开启深色模式时也不会出现白底白字。"""
+    # 日期框、日历固定显示中文（英文版 Windows 上也显示“星期四”而不是 Thursday）
+    QLocale.setDefault(QLocale(QLocale.Language.Chinese, QLocale.Country.China))
     app.setStyle("Fusion")
     hints = app.styleHints()
     if hasattr(hints, "setColorScheme"):
