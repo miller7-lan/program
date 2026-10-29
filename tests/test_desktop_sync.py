@@ -210,7 +210,7 @@ class DesktopSyncTests(unittest.TestCase):
     def test_builtin_preset_applies_until_user_disconnects(self):
         import core.sync_preset as preset
 
-        preset_file = self.tmp / "利润助手同步配置.txt"
+        preset_file = self.tmp / "ProfitHelper-sync.txt"
         preset_file.write_text("说明文字\n" + make_connection_code(self.server.url, TOKEN) + "\n", encoding="utf-8")
         original = preset.data_file_path
         preset.data_file_path = lambda name: self.tmp / name

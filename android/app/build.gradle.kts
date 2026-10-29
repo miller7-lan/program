@@ -8,9 +8,10 @@ plugins {
 }
 
 // 本机专用配置（默认服务器地址、签名信息）只放在 local.properties，不进入公开仓库
+// 按 UTF-8 读取：路径里可能有中文（Properties 默认按 ISO-8859-1 解码会出现乱码）
 val localProps = Properties().apply {
     val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
+    if (file.exists()) file.reader(Charsets.UTF_8).use { load(it) }
 }
 
 fun localProp(name: String): String = (localProps.getProperty(name) ?: "").trim()
@@ -36,7 +37,7 @@ android {
     signingConfigs {
         if (keystorePropsPath.isNotEmpty()) {
             create("release") {
-                val keystore = Properties().apply { file(keystorePropsPath).inputStream().use { load(it) } }
+                val keystore = Properties().apply { file(keystorePropsPath).reader(Charsets.UTF_8).use { load(it) } }
                 storeFile = file(keystore.getProperty("storeFile"))
                 storePassword = keystore.getProperty("storePassword")
                 keyAlias = keystore.getProperty("keyAlias")

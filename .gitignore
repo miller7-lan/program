@@ -25,3 +25,4 @@ screenshots/
 # 内置同步配置（含同步密钥，只随安装包私下分发）
 assets/sync_preset.txt
 利润助手同步配置.txt
+ProfitHelper-sync.txt
