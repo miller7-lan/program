@@ -34,6 +34,8 @@ def embed(exe: Path, code: str, out: Path) -> None:
 
 
 def main(argv: list[str]) -> int:
+    if hasattr(sys.stdout, "reconfigure"):  # Windows 控制台默认编码（如 cp1252）输出中文会报错
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     if len(argv) != 4:
         print(__doc__)
         return 2

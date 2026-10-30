@@ -44,6 +44,7 @@ jobs:
         # 用假的连接码验证“写在 exe 末尾的内置连接码”能被读到、程序照常启动；真实密钥只在本机写入，不进 CI
         python -c "from core.sync_client import make_connection_code as m; open('dummy-sync.txt', 'w').write(m('https://example.com:28443', 'PH-CI-DUMMY-KEY'))"
         python tools/embed_preset.py dist\ProfitHelper.exe dummy-sync.txt embed-test\ProfitHelper.exe
+        if ($LASTEXITCODE -ne 0) { throw "写入内置连接码失败" }
         $p = Start-Process -FilePath "embed-test\ProfitHelper.exe" -ArgumentList "--smoke-test" -PassThru
         if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw "EXE 没有在 120 秒内退出" }
         Get-Content embed-test\smoke-test.txt
