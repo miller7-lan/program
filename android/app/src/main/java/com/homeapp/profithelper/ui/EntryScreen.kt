@@ -125,7 +125,7 @@ fun EntryScreen(app: ProfitApp, entry: EntryController) {
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Palette.BorderStrong),
                 )
-                Text("留空不会清除这一天已保存的备注", style = TextStyles.Caption)
+                Text("会同步到历史记录和 Excel", style = TextStyles.Caption)
             }
             Spacer(Modifier.height(8.dp))
         }

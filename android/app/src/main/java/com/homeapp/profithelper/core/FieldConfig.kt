@@ -207,6 +207,54 @@ object FieldConfig {
         return obj
     }
 
+    /**
+     * 分类改名后改写一天数据里的键名（与桌面端 migrate_raw_data 规则相同）。
+     * parentRenames：旧一级名 → 新一级名；childRenames：新一级名 → (旧二级名 → 新二级名)。
+     */
+    fun migrateRawData(raw: RawData, parentRenames: Map<String, String>, childRenames: Map<String, Map<String, String>>): RawData {
+        val migrated = LinkedHashMap<String, Any>()
+        for ((key, value) in raw) {
+            val newKey = parentRenames[key] ?: key
+            if (value is Map<*, *>) {
+                val mapping = childRenames[newKey].orEmpty()
+                val renamed = LinkedHashMap<String, Double>()
+                (migrated[newKey] as? Map<*, *>)?.forEach { (child, amount) -> renamed[child.toString()] = toDouble(amount) }
+                for ((child, amount) in value) {
+                    val name = child.toString()
+                    renamed[mapping[name] ?: name] = toDouble(amount)
+                }
+                migrated[newKey] = renamed
+            } else {
+                migrated[newKey] = value
+            }
+        }
+        return migrated
+    }
+
+    /**
+     * 保存录入时合并（与桌面端 merge_entry_raw 相同）：当前分类以录入框为准，
+     * 当前分类里已经没有的旧数据（例如删掉的分类）原样保留，重新保存某一天也不会丢。
+     */
+    fun mergeEntryRaw(previous: RawData, collected: RawData, tree: List<FieldNode>): RawData {
+        val merged = LinkedHashMap<String, Any>()
+        for (node in tree) {
+            var value: Any = collected[node.name] ?: 0.0
+            val old = previous[node.name]
+            if (node.children.isNotEmpty() && value is Map<*, *> && old is Map<*, *>) {
+                val extra = old.filterKeys { it.toString() !in node.children }
+                if (extra.isNotEmpty()) {
+                    val combined = LinkedHashMap<String, Double>()
+                    value.forEach { (child, amount) -> combined[child.toString()] = toDouble(amount) }
+                    extra.forEach { (child, amount) -> combined[child.toString()] = toDouble(amount) }
+                    value = combined
+                }
+            }
+            merged[node.name] = value
+        }
+        for ((key, value) in previous) if (key !in merged) merged[key] = value
+        return merged
+    }
+
     /** 一级分类汇总，用于列表展示，例如“营业额 3,804 · 成本 1,321”。 */
     fun parentTotals(tree: List<FieldNode>, raw: RawData): List<Pair<String, Double>> {
         val variables = buildVariables(tree, raw)

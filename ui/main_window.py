@@ -13,7 +13,7 @@ ui/main_window.py
   各视图在 showEvent 里刷新，保证数据最新；云同步拉取到新数据时通过 event_bus 通知刷新。
 """
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QDate, QEvent, QSize, Qt
 from PySide6.QtGui import QGuiApplication, QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
@@ -93,16 +93,16 @@ class SyncPanel(QFrame):
             "off": ("cloud-off", theme.TEXT_3),
         }.get(tone, ("cloud", theme.TEXT_3))
         self._icon.set_icon(icon_name, color)
-        configured = self._sync.configured
-        self._button.setText("立即同步" if configured else "去设置")
-        icons.set_button_icon(self._button, "sync" if configured else "settings", theme.TEXT_2, 16)
-        self._button.setEnabled(tone != "busy" or not configured)
+        ready = not self._sync.needs_preset
+        self._button.setText("立即同步" if ready else "去设置")
+        icons.set_button_icon(self._button, "sync" if ready else "settings", theme.TEXT_2, 16)
+        self._button.setEnabled(tone != "busy" or not ready)
 
     def _on_click(self) -> None:
-        if self._sync.configured:
-            self._sync.sync_now()
-        else:
+        if self._sync.needs_preset:
             self._open_settings()
+        else:
+            self._sync.sync_now()
 
 
 class MainWindow(QMainWindow):
@@ -134,6 +134,7 @@ class MainWindow(QMainWindow):
             shortcut = QShortcut(QKeySequence(f"Ctrl+{index + 1}"), self)
             shortcut.activated.connect(lambda idx=index: self._switch_page(idx))
 
+        self._active_day = QDate.currentDate()
         self._switch_page(0)
 
     # ─────────────────────────────────────
@@ -222,10 +223,20 @@ class MainWindow(QMainWindow):
     def _entry_view(self) -> EntryView:
         return self._views[1]
 
+    @property
+    def _settings_view(self) -> SettingsView:
+        return self._views[3]
+
+    def _confirm_leave(self, index: int) -> bool:
+        """离开录入页 / 设置页前，确认未保存的修改。"""
+        view = self._views[index]
+        return view.confirm_leave() if hasattr(view, "confirm_leave") else True
+
     def _switch_page(self, index: int) -> None:
         current = self._stack.currentIndex()
-        if current == 1 and index != 1 and not self._entry_view.confirm_leave():
-            self._nav_buttons[current].setChecked(True)
+        if current != index and current >= 0 and not self._confirm_leave(current):
+            for i, button in enumerate(self._nav_buttons):
+                button.setChecked(i == current)
             return
         for i, button in enumerate(self._nav_buttons):
             button.setChecked(i == index)
@@ -240,6 +251,24 @@ class MainWindow(QMainWindow):
     # 生命周期
     # ─────────────────────────────────────
 
+    def changeEvent(self, event) -> None:  # noqa: N802 - Qt API
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.ActivationChange and self.isActiveWindow():
+            self._on_day_maybe_changed()
+
+    def _on_day_maybe_changed(self) -> None:
+        """窗口重新激活时（例如第二天早上从任务栏切回来）：日期相关的页面换到新的一天。"""
+        today = QDate.currentDate()
+        if today == self._active_day:
+            return
+        self._active_day = today
+        self._entry_view.roll_over_to_today()
+        current = self._stack.currentWidget()
+        if current is self._views[0]:
+            current.refresh()
+        elif current is self._views[2]:
+            current.sync_to_today()
+
     def resizeEvent(self, event) -> None:  # noqa: N802 - Qt API
         super().resizeEvent(event)
         if hasattr(self, "toast") and self.toast.isVisible():
@@ -247,8 +276,8 @@ class MainWindow(QMainWindow):
                             self.centralWidget().height() - self.toast.height() - 36)
 
     def closeEvent(self, event) -> None:  # noqa: N802 - Qt API
-        """关闭窗口时：确认未保存的录入，完成最后一次同步，再安全关闭数据库连接。"""
-        if not self._entry_view.confirm_leave():
+        """关闭窗口时：确认未保存的录入和设置，完成最后一次同步，再安全关闭数据库连接。"""
+        if not self._entry_view.confirm_leave() or not self._settings_view.confirm_leave():
             event.ignore()
             return
         self._sync.shutdown()

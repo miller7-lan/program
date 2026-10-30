@@ -34,6 +34,69 @@ object FormulaEngine {
         emptyList()
     }
 
+    /**
+     * 统一公式书写格式（与桌面端 format_formula 逐字一致）：全角符号转半角，运算符两侧各一个空格，
+     * 正负号紧贴数字，括号内侧不留空格。例如 "（营业额-成本）×0.9" → "(营业额 - 成本) * 0.9"。
+     * 无法解析的公式只做符号与空白规范化。
+     */
+    fun format(formula: String): String {
+        val text = splitPythonWhitespace(normalizeFormula(formula)).joinToString(" ")
+        if (validate(text) != null) return text
+        val tokens = try {
+            Tokenizer(text).tokenize()
+        } catch (e: FormulaException) {
+            return text
+        }
+        val out = StringBuilder()
+        var previous: String? = null
+        for (token in tokens) {
+            if (token.type == T.END) continue
+            val piece = token.text
+            val isOp = token.type == T.OP
+            when {
+                isOp && (piece == "+" || piece == "-") && (previous == null || previous == "(" || previous in BINARY_OPS) -> {
+                    out.append(piece)
+                    previous = piece
+                }
+                isOp && piece in BINARY_OPS -> {
+                    out.append(' ').append(piece).append(' ')
+                    previous = piece
+                }
+                isOp && piece == "(" -> {
+                    out.append(piece)
+                    previous = piece
+                }
+                else -> {
+                    out.append(piece)
+                    previous = "operand"
+                }
+            }
+        }
+        return out.toString()
+    }
+
+    private val BINARY_OPS = setOf("+", "-", "*", "/")
+
+    /** 与 Python str.split() 相同的空白字符拆分。 */
+    private fun splitPythonWhitespace(text: String): List<String> {
+        val words = mutableListOf<String>()
+        val current = StringBuilder()
+        for (ch in text) {
+            val space = ch in "\t\n\u000B\u000C\r\u001C\u001D\u001E\u001F \u0085\u00A0\u1680\u2028\u2029\u202F\u205F\u3000" ||
+                ch in '\u2000'..'\u200A'
+            if (space) {
+                if (current.isNotEmpty()) {
+                    words += current.toString()
+                    current.clear()
+                }
+            } else {
+                current.append(ch)
+            }
+        }
+        if (current.isNotEmpty()) words += current.toString()
+        return words
+    }
+
     fun normalizeFormula(formula: String): String {
         val nfkc = Normalizer.normalize(formula, Normalizer.Form.NFKC)
         val builder = StringBuilder(nfkc.length)

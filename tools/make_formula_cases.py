@@ -1,6 +1,7 @@
 """
 tools/make_formula_cases.py
-用桌面端（Python）公式引擎生成测试向量，安卓端单元测试逐条比对，保证两端算出的利润完全一致。
+用桌面端（Python）公式引擎生成测试向量，安卓端单元测试逐条比对，保证两端算出的利润、
+公式自动整理后的格式、分类改名后改写的数据、保存时合并的数据完全一致。
 
 运行：python3 tools/make_formula_cases.py
 """
@@ -13,8 +14,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from core.field_config import DEFAULT_FIELD_TREE, DEFAULT_PROFIT_FORMULA, build_formula_variables  # noqa: E402
-from core.formula_engine import FormulaEngine, FormulaError  # noqa: E402
+from core.field_config import (  # noqa: E402
+    DEFAULT_FIELD_TREE,
+    DEFAULT_PROFIT_FORMULA,
+    build_formula_variables,
+    merge_entry_raw,
+    migrate_raw_data,
+)
+from core.formula_engine import FormulaEngine, FormulaError, format_formula  # noqa: E402
 
 engine = FormulaEngine()
 variables = {"营业额": 1200.5, "成本": 300.25, "零钱": 50, "现金": 800, "微信": 400.5, "租金": 0, "a": 3, "b_2": 7.5}
@@ -30,6 +37,10 @@ FORMULAS = [
     "营业额-成本", "（营业额 - 成本）", "a +\n b_2", "现金×2÷4", "１２０＋３５", "营业额 − 成本", "0。5 * a",
     "ａ + 1", "(营业额 - 成本", "营业额(", "a ** 2 + abs(b_2)", "not a ** 2", "-a % 2 < 1", "(a, b_2)[0]",
     "a if b_2 else 1", "[a]", "()", "营业额 = 1",
+    # 自动整理格式
+    "账户 +邮政账户 +  微信分 + 微信分欠", "（营业额-成本）×0.9", "a--b_2", "a - - b_2", "-(a+b_2)", "+a",
+    "a*(-b_2)", "(  a  )", "a\t+\u3000b_2", "a+b_2 )", "  营业额  -成本  ", "((a+b_2)*(a-b_2))/2", "-a--a", "a*+b_2",
+    "１２０ － ３５", "a\u00a0+\u2003b_2", "True*a", "1j + a", "None - 1",
 ]
 
 rng = random.Random(20261029)
@@ -67,7 +78,7 @@ def classify(message: str) -> str:
 cases = []
 for formula in FORMULAS:
     ok, message = engine.validate(formula)
-    case = {"formula": formula, "valid": ok}
+    case = {"formula": formula, "valid": ok, "formatted": format_formula(formula)}
     if not ok:
         case["error_kind"] = classify(message)
         case["error"] = message
@@ -93,7 +104,32 @@ default_case = {
     "result": engine.evaluate(DEFAULT_PROFIT_FORMULA, tree_variables),
 }
 
+TREE = [{"name": "营业额", "children": ["账户", "现金"]}, {"name": "成本", "children": ["进货"]}, {"name": "零钱", "children": []}]
+migrate_cases = [
+    {"raw": {"营业额": {"账户": 5.0, "现金": 2.0}, "成本": {"进货": 1.0}, "零钱": 3.0},
+     "parent_renames": {"成本": "进货成本"}, "child_renames": {"营业额": {"账户": "银行账户"}}},
+    {"raw": {"营业额": {"账户": 5.0}, "收入": {"现金": 2.0}},
+     "parent_renames": {"收入": "营业额"}, "child_renames": {}},  # 改名后与已有分类合并
+    {"raw": {"甲": 1.0, "乙": 2.0}, "parent_renames": {"甲": "乙", "乙": "甲"}, "child_renames": {}},  # 互换名称
+    {"raw": {"营业额": {"账户": 5.0, "现金": 2.0}}, "parent_renames": {"营业额": "收入"},
+     "child_renames": {"收入": {"现金": "现金收入"}}},
+    {"raw": {}, "parent_renames": {"营业额": "收入"}, "child_renames": {}},
+]
+for item in migrate_cases:
+    item["expected"] = migrate_raw_data(item["raw"], item["parent_renames"], item["child_renames"])
+merge_cases = [
+    {"previous": {"营业额": {"账户": 1.0, "旧子项": 9.0}, "旧分类": 3.0, "零钱": 1.0},
+     "collected": {"营业额": {"账户": 2.0, "现金": 0.0}, "成本": {"进货": 4.0}, "零钱": 0.0}},
+    {"previous": {}, "collected": {"营业额": {"账户": 2.0, "现金": 1.0}, "成本": {"进货": 0.0}, "零钱": 5.0}},
+    {"previous": {"营业额": 7.0, "成本": {"进货": 1.0, "运费": 2.0}},
+     "collected": {"营业额": {"账户": 0.0, "现金": 0.0}, "成本": {"进货": 3.0}, "零钱": 0.0}},
+]
+for item in merge_cases:
+    item["tree"] = TREE
+    item["expected"] = merge_entry_raw(item["previous"], item["collected"], TREE)
+
 out = ROOT / "android" / "app" / "src" / "test" / "resources" / "formula_cases.json"
-out.write_text(json.dumps({"variables": variables, "cases": cases, "default_tree_case": default_case},
+out.write_text(json.dumps({"variables": variables, "cases": cases, "default_tree_case": default_case,
+                           "migrate_cases": migrate_cases, "merge_cases": merge_cases},
                           ensure_ascii=False, indent=1), encoding="utf-8")
 print(f"{len(cases)} 条公式用例已写入 {out.relative_to(ROOT)}")

@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,12 +35,26 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-/** 全局提示（底部 Snackbar）。 */
+data class AlertMessage(val title: String, val message: String)
+
+/** 全局提示：普通结果用底部 Snackbar；格式错误等需要用户留意的问题用对话框。 */
 object UiEvents {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val messages = _messages.asSharedFlow()
+
+    var currentAlert by mutableStateOf<AlertMessage?>(null)
+        private set
+
     fun show(message: String) {
         _messages.tryEmit(message)
+    }
+
+    fun alert(title: String, message: String) {
+        currentAlert = AlertMessage(title, message)
+    }
+
+    fun dismissAlert() {
+        currentAlert = null
     }
 }
 
@@ -58,12 +73,20 @@ fun AppRoot(app: ProfitApp) {
     var pendingTab by remember { mutableStateOf<Int?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val entry = remember { EntryController(app.ledger) }
+    val settings = remember { SettingsController(app.ledger) }
 
+    val resumeTick by app.resumeTick.collectAsState()
+    LaunchedEffect(resumeTick) { entry.rollOverToToday() }
     LaunchedEffect(Unit) { app.sync.messages.collect { snackbar.showSnackbar(it) } }
     LaunchedEffect(Unit) { UiEvents.messages.collect { snackbar.showSnackbar(it) } }
 
     fun requestTab(target: Int) {
-        if (tab == 1 && target != 1 && entry.isDirty) pendingTab = target else tab = target
+        when {
+            target == tab -> Unit
+            tab == 1 && entry.isDirty -> pendingTab = target
+            tab == 3 && settings.isDirty -> pendingTab = target
+            else -> tab = target
+        }
     }
 
     fun openEntry(date: LocalDate) {
@@ -102,24 +125,57 @@ fun AppRoot(app: ProfitApp) {
                 0 -> DashboardScreen(app, onOpenEntry = ::openEntry)
                 1 -> EntryScreen(app, entry)
                 2 -> HistoryScreen(app, onOpenEntry = ::openEntry)
-                else -> SettingsScreen(app)
+                else -> SettingsScreen(app, settings)
             }
         }
     }
 
     pendingTab?.let { target ->
-        UnsavedChangesDialog(
-            dateLabel = entry.dateTitle(),
-            onSave = {
-                pendingTab = null
-                if (entry.saveAndReport()) tab = target
-            },
-            onDiscard = {
-                pendingTab = null
-                entry.discard()
-                tab = target
-            },
-            onCancel = { pendingTab = null },
+        if (tab == 3) {
+            AlertDialog(
+                onDismissRequest = { pendingTab = null },
+                title = { Text("设置尚未保存") },
+                text = { Text("分类或公式的修改还没有保存。") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingTab = null
+                        if (settings.save()) tab = target
+                    }) { Text("保存") }
+                },
+                dismissButton = {
+                    androidx.compose.foundation.layout.Row {
+                        TextButton(onClick = { pendingTab = null }) { Text("取消", color = Palette.Text2) }
+                        TextButton(onClick = {
+                            pendingTab = null
+                            settings.load()
+                            tab = target
+                        }) { Text("不保存", color = Palette.Danger) }
+                    }
+                },
+            )
+        } else {
+            UnsavedChangesDialog(
+                dateLabel = entry.dateTitle(),
+                onSave = {
+                    pendingTab = null
+                    if (entry.saveAndReport()) tab = target
+                },
+                onDiscard = {
+                    pendingTab = null
+                    entry.discard()
+                    tab = target
+                },
+                onCancel = { pendingTab = null },
+            )
+        }
+    }
+
+    UiEvents.currentAlert?.let { alert ->
+        AlertDialog(
+            onDismissRequest = { UiEvents.dismissAlert() },
+            title = { Text(alert.title) },
+            text = { Text(alert.message) },
+            confirmButton = { TextButton(onClick = { UiEvents.dismissAlert() }) { Text("知道了") } },
         )
     }
 }

@@ -23,6 +23,8 @@ core/formula_engine.py
 """
 
 import ast
+import io
+import tokenize
 import unicodedata
 from typing import Any
 
@@ -195,3 +197,35 @@ class FormulaEngine:
                 return +operand
 
         raise FormulaError(f"不支持的表达式类型：{type(node).__name__}")
+
+
+_BINARY_OPS = {"+", "-", "*", "/"}
+
+
+def format_formula(formula: str) -> str:
+    """
+    统一公式书写格式：全角符号转半角，运算符两侧各一个空格，正负号紧贴数字，括号内侧不留空格。
+    例如 "（营业额-成本）×0.9" → "(营业额 - 成本) * 0.9"。无法解析的公式只做符号与空白规范化。
+    """
+    text = " ".join(normalize_formula(formula).split())
+    if not FormulaEngine().validate(text)[0]:
+        return text
+    pieces: list[str] = []
+    previous: str | None = None
+    for token in tokenize.generate_tokens(io.StringIO(text).readline):
+        if token.type in (tokenize.NEWLINE, tokenize.NL, tokenize.ENDMARKER, tokenize.INDENT, tokenize.DEDENT):
+            continue
+        piece = token.string
+        if piece in ("+", "-") and previous in (None, "(", *_BINARY_OPS):
+            pieces.append(piece)
+            previous = piece
+        elif piece in _BINARY_OPS:
+            pieces.append(f" {piece} ")
+            previous = piece
+        elif piece == "(":
+            pieces.append(piece)
+            previous = piece
+        else:
+            pieces.append(piece)
+            previous = "operand"
+    return "".join(pieces)

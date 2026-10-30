@@ -5,8 +5,10 @@ ui/sync_manager.py
 触发时机：
   - 启动后自动同步一次
   - 本机保存 / 删除 / 修改设置后 2.5 秒（合并连续修改）
-  - 每 5 分钟一次
+  - 每分钟一次（及时拉取手机上的修改）
   - 用户点击“立即同步”
+
+服务器配置内置在程序旁的 ProfitHelper-sync.txt 里，用户不需要填写。
 
 同步密钥被拒绝后暂停自动同步（只保留手动“立即同步”），避免旧密钥反复请求触发服务器的失败次数限制，
 连带同一网络下的其他设备也被暂时拒绝。
@@ -19,8 +21,8 @@ import threading
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from core.event_bus import event_bus
-from core.sync_client import SyncAuthError, SyncConfig, SyncEngine, SyncError, describe_time
-from core.sync_preset import apply_preset_if_needed
+from core.sync_client import SyncAuthError, SyncConfig, SyncEngine, SyncError, describe_time, parse_connection_code
+from core.sync_preset import apply_preset_if_needed, find_preset_code
 
 
 class SyncManager(QObject):
@@ -28,7 +30,7 @@ class SyncManager(QObject):
     _worker_done = Signal(object, object)
 
     DEBOUNCE_MS = 2500
-    PERIODIC_MS = 5 * 60 * 1000
+    PERIODIC_MS = 60 * 1000
 
     def __init__(self, db, app_version: str, parent=None):
         super().__init__(parent)
@@ -76,11 +78,26 @@ class SyncManager(QObject):
         self._refresh_idle_state()
         self._apply_timers()
 
-    def disconnect(self) -> None:
-        self._db.forget_sync_server()
-        self._db.set_sync_meta("preset_disabled", "1")  # 主动断开后不再自动套用内置配置
+    @property
+    def needs_preset(self) -> bool:
+        """没有可用的同步配置（未找到配置文件，或密钥已失效），需要放入新的 ProfitHelper-sync.txt。"""
+        return not self.configured or self._auth_failed
+
+    def reload_preset(self) -> bool:
+        """设置页“重新检测”：重新读取程序旁的内置配置并立即同步；没有找到有效的配置文件时返回 False。"""
+        code = find_preset_code()
+        try:
+            parse_connection_code(code or "")
+        except SyncError:
+            return False
+        apply_preset_if_needed(self.engine, force=True)
+        self._auth_failed = False
+        if self.state != "busy":
+            self.state = "idle"
         self._refresh_idle_state()
         self._apply_timers()
+        self.sync_now()
+        return True
 
     def start(self) -> None:
         self._apply_timers()
@@ -135,7 +152,7 @@ class SyncManager(QObject):
             self.message = str(error)
             if isinstance(error, SyncAuthError):
                 self._auth_failed = True
-                self.message = "同步密钥不正确，已暂停自动同步。请更新内置配置，或在“更换服务器”中重新填写"
+                self.message = "同步密钥已失效，已暂停自动同步。请把新的 ProfitHelper-sync.txt 放进程序文件夹，再到设置里点“重新检测”"
         else:
             self._auth_failed = False
             self._invalid = list(result.invalid)
@@ -186,7 +203,7 @@ class SyncManager(QObject):
         pending = self._db.count_pending_changes() if self.configured else 0
         last = describe_time(self._db.get_sync_meta("last_sync_at"))
         if self.state == "off":
-            return "未开启云同步", "到设置里粘贴连接码即可", "off"
+            return "未开启云同步", "程序文件夹里缺少 ProfitHelper-sync.txt", "off"
         if self.state == "busy":
             return "正在同步…", f"上次 {last}" if last else "首次同步", "busy"
         if self.state == "error":

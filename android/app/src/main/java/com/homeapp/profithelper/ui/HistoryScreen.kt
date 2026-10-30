@@ -1,5 +1,6 @@
 package com.homeapp.profithelper.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -19,6 +20,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,6 +66,7 @@ import com.homeapp.profithelper.ui.theme.TextStyles
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val PRESETS = listOf("本月", "上月", "近 30 天", "今年", "全部", "自定义")
 private const val DAY_MS = 86_400_000L
@@ -83,7 +87,7 @@ fun HistoryScreen(app: ProfitApp, onOpenEntry: (LocalDate) -> Unit) {
     val scope = rememberCoroutineScope()
     val today = LocalDate.now()
 
-    val (start, end) = remember(preset, customStart, customEnd, version) {
+    val (start, end) = remember(preset, customStart, customEnd, version, today) {
         when (preset) {
             0 -> today.withDayOfMonth(1) to today
             1 -> today.withDayOfMonth(1).minusMonths(1).let { it to it.plusMonths(1).minusDays(1) }
@@ -100,6 +104,8 @@ fun HistoryScreen(app: ProfitApp, onOpenEntry: (LocalDate) -> Unit) {
     val filtered = records.filter { query.isBlank() || query in it.note || query in it.date }
     val summary = Report.rangeSummary(filtered)
 
+    BackHandler(enabled = selected.isNotEmpty()) { selected = emptySet() }  // 多选时返回键先取消选择
+
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
     ) { uri ->
@@ -108,30 +114,15 @@ fun HistoryScreen(app: ProfitApp, onOpenEntry: (LocalDate) -> Unit) {
                 runCatching {
                     context.contentResolver.openOutputStream(uri)!!.use { XlsxExporter(ledger).export(it, start.format(ISO), end.format(ISO)) }
                 }.onSuccess { UiEvents.show("已导出 Excel：${start.format(ISO)} 至 ${end.format(ISO)}") }
-                    .onFailure { UiEvents.show("导出失败：${it.message}") }
+                    .onFailure { error -> withContext(Dispatchers.Main) { UiEvents.alert("导出失败", error.message ?: "写入文件时出错") } }
             }
         }
     }
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().background(Color.White).padding(top = 10.dp, bottom = 10.dp)) {
-            Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (selected.isEmpty()) {
-                    Text("历史记录", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { exportLauncher.launch("利润报表_${start.format(ISO)}_${end.format(ISO)}.xlsx") }) {
-                        AppIcon(R.drawable.ic_sheet, Palette.Accent, 18.dp)
-                        HSpace(6.dp)
-                        Text("导出 Excel")
-                    }
-                } else {
-                    Text("已选 ${selected.size} 天", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { selected = emptySet() }) { Text("取消", color = Palette.Text2) }
-                    TextButton(onClick = { confirmDelete = true }) {
-                        AppIcon(R.drawable.ic_trash, Palette.Danger, 18.dp)
-                        HSpace(4.dp)
-                        Text("删除", color = Palette.Danger)
-                    }
-                }
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("历史记录", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
             }
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(PRESETS.size) { index ->
@@ -168,7 +159,7 @@ fun HistoryScreen(app: ProfitApp, onOpenEntry: (LocalDate) -> Unit) {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.weight(1f),
         ) {
             item {
                 SectionCard {
@@ -221,7 +212,38 @@ fun HistoryScreen(app: ProfitApp, onOpenEntry: (LocalDate) -> Unit) {
                     }
                 }
             }
-            item { Text("长按可多选删除", style = TextStyles.Caption, modifier = Modifier.padding(horizontal = 4.dp)) }
+        }
+
+        // 底部固定操作栏：未选择时导出 Excel，长按选择记录后可删除
+        Surface(color = Color.White) {
+            Column {
+                HorizontalDivider(color = Palette.Border)
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (selected.isEmpty()) {
+                        Text("点一条记录可修改，长按可多选删除", style = TextStyles.Caption, modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { exportLauncher.launch("利润报表_${start.format(ISO)}_${end.format(ISO)}.xlsx") },
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                        ) {
+                            AppIcon(R.drawable.ic_sheet, Color.White, 18.dp)
+                            HSpace(6.dp)
+                            Text("导出 Excel")
+                        }
+                    } else {
+                        Text("已选 ${selected.size} 天", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { selected = emptySet() }) { Text("取消", color = Palette.Text2) }
+                        Button(
+                            onClick = { confirmDelete = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Palette.Danger),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                        ) {
+                            AppIcon(R.drawable.ic_trash, Color.White, 18.dp)
+                            HSpace(6.dp)
+                            Text("删除")
+                        }
+                    }
+                }
+            }
         }
     }
 

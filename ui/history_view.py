@@ -5,7 +5,7 @@ ui/history_view.py
   - 顶部：快捷区间（本月 / 上月 / 近 30 天 / 今年 / 全部）、自定义日期、备注搜索
   - 汇总条：记录天数、合计、日均、最高、最低
   - 表格：日期 / 星期 / 利润 / 各一级分类汇总 / 备注，可排序；双击打开编辑
-  - 底部：删除选中（支持多选）、导出 Excel
+  - 底部：编辑、删除选中（支持多选）、导出 Excel
   - 监听 event_bus.data_changed → 自动刷新表格
 """
 
@@ -96,10 +96,7 @@ class HistoryView(QWidget):
         layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(14)
 
-        header, self._subtitle, actions = page_header("历史记录", "双击任意一行可打开编辑")
-        self._export_btn = make_button("导出 Excel", "soft", "sheet")
-        self._export_btn.clicked.connect(self._on_export)
-        actions.addWidget(self._export_btn)
+        header, self._subtitle, _ = page_header("历史记录", "双击任意一行可打开编辑")
         layout.addLayout(header)
 
         filter_card = Card()
@@ -195,6 +192,11 @@ class HistoryView(QWidget):
         self._delete_btn = make_button("删除选中", "danger", "trash")
         self._delete_btn.clicked.connect(self._on_delete)
         action_row.addWidget(self._delete_btn)
+        action_row.addSpacing(8)
+        self._export_btn = make_button("导出 Excel", "primary", "sheet")
+        self._export_btn.setToolTip("导出当前日期范围内的记录")
+        self._export_btn.clicked.connect(self._on_export)
+        action_row.addWidget(self._export_btn)
         layout.addLayout(action_row)
 
         self._load_filter_defaults()
@@ -440,12 +442,16 @@ class HistoryView(QWidget):
         self._export_thread.error.connect(on_error)
         self._export_thread.start()
 
-    def showEvent(self, event) -> None:  # noqa: N802 - Qt API
+    def sync_to_today(self) -> None:
+        """快捷区间随日期变化（例如跨月后的“本月”）；自定义区间至少延伸到今天。"""
         if self._active_preset >= 0:
-            self._apply_preset(self._active_preset)  # 快捷区间随日期变化（例如跨月后的“本月”）
+            self._apply_preset(self._active_preset)
         else:
             with QSignalBlocker(self._end_date):
                 self._end_date.setDate(max(self._end_date.date(), QDate.currentDate()))
             self.refresh()
+
+    def showEvent(self, event) -> None:  # noqa: N802 - Qt API
+        self.sync_to_today()
         super().showEvent(event)
 

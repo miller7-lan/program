@@ -207,7 +207,7 @@ class DesktopSyncTests(unittest.TestCase):
             engine.sync()
         self.assertTrue(self.db_b.get_sync_meta("last_error"))
 
-    def test_builtin_preset_applies_until_user_disconnects(self):
+    def test_builtin_preset_applies_automatically(self):
         import core.sync_preset as preset
 
         preset_file = self.tmp / "ProfitHelper-sync.txt"
@@ -222,8 +222,8 @@ class DesktopSyncTests(unittest.TestCase):
             self.assertEqual(engine.sync().pulled, 0)
             self.assertFalse(preset.apply_preset_if_needed(engine))  # 已设置过，不重复套用
             fresh.forget_sync_server()
-            fresh.set_sync_meta("preset_disabled", "1")
-            self.assertFalse(preset.apply_preset_if_needed(engine))  # 用户主动断开后不再自动连接
+            fresh.set_sync_meta("preset_disabled", "1")  # 旧版本点过“断开”：新版本没有断开入口，仍自动连接
+            self.assertTrue(preset.apply_preset_if_needed(engine))
             fresh.close()
         finally:
             preset.data_file_path = original

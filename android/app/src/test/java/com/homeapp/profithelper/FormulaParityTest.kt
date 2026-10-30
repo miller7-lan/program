@@ -1,8 +1,11 @@
 package com.homeapp.profithelper
 
 import com.homeapp.profithelper.core.FieldConfig
+import com.homeapp.profithelper.core.FieldNode
 import com.homeapp.profithelper.core.FormulaEngine
 import com.homeapp.profithelper.core.FormulaException
+import com.homeapp.profithelper.core.RawData
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -10,7 +13,8 @@ import org.junit.Test
 
 /**
  * 与桌面端（Python）逐条比对：测试向量由 tools/make_formula_cases.py 生成。
- * 两端对同一公式必须给出相同的结果或相同的错误说明。
+ * 两端对同一公式必须给出相同的结果或相同的错误说明、相同的自动整理格式；
+ * 分类改名后改写的数据、保存录入时合并的数据也必须相同。
  */
 class FormulaParityTest {
 
@@ -32,6 +36,11 @@ class FormulaParityTest {
         for (index in 0 until cases.length()) {
             val case = cases.getJSONObject(index)
             val formula = case.getString("formula")
+            val formatted = FormulaEngine.format(formula)
+            if (formatted != case.getString("formatted")) {
+                failures += "#$index $formula: 整理格式应为「${case.getString("formatted")}」，实际「$formatted」"
+            }
+            if (FormulaEngine.format(formatted) != formatted) failures += "#$index $formula: 再次整理后格式又变了"
             val expectedValid = case.getBoolean("valid")
             val validation = FormulaEngine.validate(formula)
             if ((validation == null) != expectedValid) {
@@ -65,19 +74,59 @@ class FormulaParityTest {
         assertTrue("与桌面端不一致：\n" + failures.joinToString("\n"), failures.isEmpty())
     }
 
-    @Test
-    fun defaultTreeVariablesAndProfitMatchDesktop() {
-        val case = data.getJSONObject("default_tree_case")
-        val rawJson = case.getJSONObject("raw_data")
+    private fun rawOf(json: JSONObject): RawData {
         val raw = LinkedHashMap<String, Any>()
-        for (key in rawJson.keys()) {
-            val value = rawJson.get(key)
+        for (key in json.keys()) {
+            val value = json.get(key)
             raw[key] = if (value is JSONObject) {
                 value.keys().asSequence().associateWith { value.getDouble(it) }
             } else {
                 (value as Number).toDouble()
             }
         }
+        return raw
+    }
+
+    private fun stringMap(json: JSONObject): Map<String, String> = json.keys().asSequence().associateWith { json.getString(it) }
+
+    private fun treeOf(json: JSONArray): List<FieldNode> = (0 until json.length()).map { index ->
+        val node = json.getJSONObject(index)
+        val children = node.getJSONArray("children")
+        FieldNode(node.getString("name"), (0 until children.length()).map { children.getString(it) })
+    }
+
+    @Test
+    fun renameMigrationMatchesDesktop() {
+        val cases = data.getJSONArray("migrate_cases")
+        assertTrue(cases.length() > 0)
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val childJson = case.getJSONObject("child_renames")
+            val children = childJson.keys().asSequence().associateWith { stringMap(childJson.getJSONObject(it)) }
+            val actual = FieldConfig.migrateRawData(rawOf(case.getJSONObject("raw")), stringMap(case.getJSONObject("parent_renames")), children)
+            assertEquals("改名用例 #$index", rawOf(case.getJSONObject("expected")), actual)
+        }
+    }
+
+    @Test
+    fun entryMergeMatchesDesktop() {
+        val cases = data.getJSONArray("merge_cases")
+        assertTrue(cases.length() > 0)
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val actual = FieldConfig.mergeEntryRaw(
+                rawOf(case.getJSONObject("previous")),
+                rawOf(case.getJSONObject("collected")),
+                treeOf(case.getJSONArray("tree")),
+            )
+            assertEquals("合并用例 #$index", rawOf(case.getJSONObject("expected")), actual)
+        }
+    }
+
+    @Test
+    fun defaultTreeVariablesAndProfitMatchDesktop() {
+        val case = data.getJSONObject("default_tree_case")
+        val raw = rawOf(case.getJSONObject("raw_data"))
         val expected = case.getJSONObject("variables")
         val actual = FieldConfig.buildVariables(FieldConfig.DEFAULT_TREE, raw)
         assertEquals(expected.keys().asSequence().toSet(), actual.keys)

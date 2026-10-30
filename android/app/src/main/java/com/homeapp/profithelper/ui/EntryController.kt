@@ -51,6 +51,7 @@ class EntryController(private val ledger: Ledger) {
     private var snapshotValues: Map<String, Any> = emptyMap()
     private var snapshotNote = ""
     private var loadedVersion = -1L
+    private var loadedAsToday = true
 
     init {
         load(date)
@@ -94,6 +95,13 @@ class EntryController(private val ledger: Ledger) {
         snapshotValues = normalizedValues()
         snapshotNote = note.trim()
         loadedVersion = ledger.version.value
+        loadedAsToday = target == LocalDate.now()
+    }
+
+    /** 正在看的是“今天”而日期已过零点（例如应用一直开着）：没有未保存的修改时自动换到新的今天。 */
+    fun rollOverToToday() {
+        val today = LocalDate.now()
+        if (loadedAsToday && date != today && !isDirty) load(today)
     }
 
     fun requestDate(target: LocalDate) {
@@ -111,9 +119,42 @@ class EntryController(private val ledger: Ledger) {
         }
     }
 
-    /** 数据（含云同步拉取）或分类设置变化后重新读取；有未保存的修改时保留用户输入。 */
+    /**
+     * 数据（含云同步拉取）或分类设置变化后重新读取。有未保存的输入时只刷新分类和公式并保留输入
+     * （与桌面端一致）；这一天的记录若同时被同步改过，保存时仍会提示，避免静默覆盖。
+     */
     fun onDataVersion(version: Long) {
-        if (version != loadedVersion && !isDirty) load(date)
+        if (version == loadedVersion) return
+        if (!isDirty) {
+            load(date)
+            return
+        }
+        loadedVersion = version
+        formula = ledger.profitFormula()
+        val newTree = ledger.fieldTree()
+        if (newTree == tree) return
+        val raw = loadedRecord?.rawData ?: emptyMap()
+        val keys = mutableSetOf<String>()
+        for (node in newTree) {
+            if (node.children.isEmpty()) {
+                keys += node.name
+                values.getOrPut(node.name) {
+                    fmtAmountInput(when (val stored = raw[node.name]) {
+                        is Map<*, *> -> stored.values.sumOf { FieldConfig.toDouble(it) }
+                        else -> FieldConfig.toDouble(stored)
+                    })
+                }
+            } else {
+                val stored = raw[node.name] as? Map<*, *>
+                for (child in node.children) {
+                    val key = key(node.name, child)
+                    keys += key
+                    values.getOrPut(key) { fmtAmountInput(FieldConfig.toDouble(stored?.get(child))) }
+                }
+            }
+        }
+        (values.keys - keys).forEach { values.remove(it) }
+        tree = newTree
     }
 
     fun firstInvalidKey(): String? = values.entries.firstOrNull { evaluateAmount(it.value) == null }?.key
@@ -146,17 +187,20 @@ class EntryController(private val ledger: Ledger) {
 
     fun saveAndReport(force: Boolean = false): Boolean {
         firstInvalidKey()?.let {
-            UiEvents.show("「${displayName(it)}」请输入数字或算式")
+            UiEvents.alert(
+                "金额格式错误",
+                "「${displayName(it)}」填写的“${values[it]?.trim()}”不是有效的金额。\n\n请输入数字或算式，例如：120、85.5、120+35、200-12.5",
+            )
             return false
         }
         if (note.trim().length > Ledger.NOTE_MAX_CHARS) {
-            UiEvents.show("备注最多 ${Ledger.NOTE_MAX_CHARS} 个字，请精简后再保存")
+            UiEvents.alert("备注太长", "备注最多 ${Ledger.NOTE_MAX_CHARS} 个字，当前 ${note.trim().length} 个字，请精简后再保存。")
             return false
         }
         val raw = rawData()
         val (profit, error) = profit(raw)
         if (profit == null) {
-            UiEvents.show("利润公式有误：$error")
+            UiEvents.alert("公式格式错误", "利润公式无法计算：$error\n\n请到“设置 → 利润公式”中修改。")
             return false
         }
         // 打开这一天之后它被云同步（其他设备）改过：先让用户确认，避免静默覆盖
@@ -165,7 +209,9 @@ class EntryController(private val ledger: Ledger) {
             return false
         }
         conflictPending = false
-        ledger.upsertRecord(date.format(ISO), profit, raw, note.trim())
+        // 保留这一天里当前分类以外的数据（例如删掉的分类、其他设备新增的分类），不因保存而丢失
+        val merged = FieldConfig.mergeEntryRaw(loadedRecord?.rawData ?: emptyMap(), raw, tree)
+        ledger.upsertRecord(date.format(ISO), profit, merged, note.trim(), keepNoteIfEmpty = false)
         load(date)
         UiEvents.show("已保存 ${dateTitle()} · 利润 ${fmtMoney(profit)}")
         return true

@@ -2,9 +2,10 @@
 ui/entry_view.py
 录入页 — 用户录入当日各项账目数据并保存。
 
-  - 顶部固定：日期切换（前一天 / 后一天 / 今天）、记录状态、按公式实时计算的当日利润、保存按钮
-  - 下方滚动：每个一级分类一张卡片，二级分类按窗口宽度自动排成多列，并显示小计
-  - 金额框支持直接输入算式（如 120+35），回车跳到下一项，Ctrl+S 保存
+  - 顶部固定：日期切换（前一天 / 后一天 / 今天）、记录状态
+  - 中间滚动：每个一级分类一张卡片，二级分类按窗口宽度自动排成多列，并显示小计；最后是备注
+  - 底部固定：按公式实时计算的当日利润、撤销修改、保存记录
+  - 金额框支持直接输入算式（如 120+35），回车跳到下一项，Ctrl+S 保存；格式错误时弹窗提醒
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from core.database import NOTE_MAX_CHARS
 from core.event_bus import event_bus
-from core.field_config import build_formula_variables, load_field_tree_from_json
+from core.field_config import build_formula_variables, load_field_tree_from_json, merge_entry_raw
 from core.formula_engine import FormulaEngine, FormulaError, normalize_formula
 from ui import theme
 from ui.widgets import Badge, Card, label, make_button, page_header, set_tone
@@ -104,6 +105,7 @@ class EntryView(QWidget):
         self._grid_columns = 0
         self._snapshot: tuple | None = None
         self._loaded_record: dict | None = None
+        self._loaded_as_today = True
         self._has_record = False
         self._current_date = QDate.currentDate()
 
@@ -121,19 +123,16 @@ class EntryView(QWidget):
     # ─────────────────────────────────────
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        body = QWidget()
+        outer.addWidget(body, 1)
+        layout = QVBoxLayout(body)
         layout.setContentsMargins(28, 24, 28, 0)
         layout.setSpacing(14)
 
-        header, _, actions = page_header("录入", "支持直接输入算式（如 120+35）· Enter 跳到下一项 · Ctrl+S 保存")
-        profit_panel = Card(object_name="ProfitPanel")
-        profit_layout = QVBoxLayout(profit_panel)
-        profit_layout.setContentsMargins(16, 8, 18, 8)
-        profit_layout.setSpacing(0)
-        profit_layout.addWidget(label("当日利润（按公式计算）", "ProfitCaption"))
-        self._profit_value = label("¥0.00", "ProfitValue")
-        profit_layout.addWidget(self._profit_value)
-        actions.addWidget(profit_panel)
+        header, _, _ = page_header("录入", "支持直接输入算式（如 120+35）· Enter 跳到下一项 · Ctrl+S 保存")
         layout.addLayout(header)
 
         toolbar = Card()
@@ -166,19 +165,6 @@ class EntryView(QWidget):
         self._dirty_badge = Badge()
         bar.addWidget(self._dirty_badge)
         bar.addStretch()
-
-        self._error_label = label("", "ErrorText")
-        bar.addWidget(self._error_label)
-
-        self._revert_btn = make_button("撤销修改", "ghost")
-        self._revert_btn.clicked.connect(self._load_current_date)
-        bar.addWidget(self._revert_btn)
-
-        self._save_btn = make_button("保存记录", "primary", "save")
-        self._save_btn.setMinimumWidth(116)
-        self._save_btn.setToolTip("保存（Ctrl+S）")
-        self._save_btn.clicked.connect(self._on_save)
-        bar.addWidget(self._save_btn)
         layout.addWidget(toolbar)
 
         self._scroll = QScrollArea()
@@ -200,7 +186,7 @@ class EntryView(QWidget):
         note_head = QHBoxLayout()
         note_head.addWidget(label("备注", "CategoryTitle"))
         note_head.addStretch()
-        note_head.addWidget(label("会同步到历史表格和 Excel；留空不会清除这一天已保存的备注", "CategoryMeta"))
+        note_head.addWidget(label("会同步到历史表格和 Excel", "CategoryMeta"))
         note_layout.addLayout(note_head)
         self._note_input = QPlainTextEdit()
         self._note_input.setPlaceholderText("例如：租金已支付、活动日营业额偏高")
@@ -208,6 +194,32 @@ class EntryView(QWidget):
         self._note_input.textChanged.connect(self._update_state)
         note_layout.addWidget(self._note_input)
         self._note_card = note_card
+
+        # 底部固定操作栏：当日利润 + 撤销 / 保存
+        action_bar = Card(object_name="ActionBar")
+        actions = QHBoxLayout(action_bar)
+        actions.setContentsMargins(28, 10, 28, 10)
+        actions.setSpacing(10)
+        profit_box = QVBoxLayout()
+        profit_box.setSpacing(0)
+        profit_box.addWidget(label("当日利润（按公式计算）", "ProfitCaption"))
+        self._profit_value = label("¥0.00", "ProfitValue")
+        profit_box.addWidget(self._profit_value)
+        actions.addLayout(profit_box)
+        actions.addSpacing(16)
+        self._error_label = label("", "ErrorText", wrap=True)
+        actions.addWidget(self._error_label, 1)
+
+        self._revert_btn = make_button("撤销修改", "ghost")
+        self._revert_btn.clicked.connect(self._load_current_date)
+        actions.addWidget(self._revert_btn)
+
+        self._save_btn = make_button("保存记录", "primary", "save")
+        self._save_btn.setMinimumWidth(116)
+        self._save_btn.setToolTip("保存（Ctrl+S）")
+        self._save_btn.clicked.connect(self._on_save)
+        actions.addWidget(self._save_btn)
+        outer.addWidget(action_bar)
 
     def _rebuild_fields(self) -> None:
         while self._fields_layout.count():
@@ -386,12 +398,14 @@ class EntryView(QWidget):
 
         profit, error = self._compute_profit(raw_data)
         if first_invalid is not None:
-            self._error_label.setText(f"「{first_invalid.display_name}」格式不正确")
+            self._error_label.setText(f"「{first_invalid.display_name}」格式不正确，请输入数字或算式")
+            self._error_label.setToolTip("")
         elif error:
-            self._error_label.setText("利润公式有误，请到设置页检查")
+            self._error_label.setText("利润公式格式错误，请到设置页检查")
             self._error_label.setToolTip(error)
         else:
             self._error_label.setText("")
+            self._error_label.setToolTip("")
         if profit is None:
             self._profit_value.setText("公式有误")
             set_tone(self._profit_value, "error")
@@ -458,6 +472,7 @@ class EntryView(QWidget):
         date_str = self._current_date.toString("yyyy-MM-dd")
         record = self._db.get_record(date_str)
         self._loaded_record = record
+        self._loaded_as_today = self._current_date == QDate.currentDate()
         self._has_record = record is not None
         raw_data = record["raw_data"] if record else {}
         for field_name, line_edit in self._field_inputs.items():
@@ -492,15 +507,20 @@ class EntryView(QWidget):
     def _on_save(self) -> bool:
         raw_data, first_invalid = self._collect()
         if first_invalid is not None:
+            self._scroll.ensureWidgetVisible(first_invalid, 40, 60)
+            QMessageBox.warning(
+                self,
+                "金额格式错误",
+                f"「{first_invalid.display_name}」填写的“{first_invalid.text().strip()}”不是有效的金额。\n\n"
+                "请输入数字或算式，例如：120、85.5、120+35、200-12.5",
+            )
             first_invalid.setFocus()
             first_invalid.selectAll()
-            self._scroll.ensureWidgetVisible(first_invalid, 40, 60)
-            event_bus.toast_requested.emit(f"「{first_invalid.display_name}」请输入数字或算式", "error")
             return False
 
         total_profit, error = self._compute_profit(raw_data)
         if total_profit is None:
-            QMessageBox.warning(self, "公式计算错误", f"{error}\n\n请到“设置 → 利润公式”中检查。")
+            QMessageBox.warning(self, "公式格式错误", f"利润公式无法计算：{error}\n\n请到“设置 → 利润公式”中修改。")
             return False
 
         date_str = self._current_date.toString("yyyy-MM-dd")
@@ -510,7 +530,10 @@ class EntryView(QWidget):
             return False
         if not self._confirm_overwrite_if_changed(date_str):
             return False
-        self._db.upsert_record(date_str, total_profit, raw_data, note_text)
+        # 保留这一天里当前分类以外的数据（例如删掉的分类、其他设备新增的分类），不因保存而丢失
+        previous_raw = self._loaded_record["raw_data"] if self._loaded_record else {}
+        raw_data = merge_entry_raw(previous_raw, raw_data, self._field_tree)
+        self._db.upsert_record(date_str, total_profit, raw_data, note_text, keep_note_if_empty=False)
         self._load_current_date()
         event_bus.data_changed.emit()
         event_bus.toast_requested.emit(
@@ -543,15 +566,38 @@ class EntryView(QWidget):
     # ─────────────────────────────────────
 
     def _on_config_changed(self) -> None:
+        # 分类被修改（本机设置页或云同步）：重建输入框，同时保留正在输入、尚未保存的内容
+        typed = {key: line_edit.text() for key, line_edit in self._field_inputs.items()} \
+            if self.has_unsaved_changes() else None
+        note = self._note_input.toPlainText()
+        loaded = self._loaded_record
         self._rebuild_fields()
+        if typed is None:
+            return
+        self._loaded_record = loaded  # 这一天若同时被同步改过，保存时仍会提示，避免静默覆盖
+        for key, text in typed.items():
+            line_edit = self._field_inputs.get(key)
+            if line_edit is not None:
+                line_edit.setText(text)
+        with QSignalBlocker(self._note_input):
+            self._note_input.setPlainText(note)
+        self._update_state()
 
     def _on_data_changed(self) -> None:
         # 云同步或其他页面修改了数据：没有未保存修改时才刷新，避免覆盖用户正在输入的内容
         if not self.has_unsaved_changes():
             self._load_current_date()
 
+    def roll_over_to_today(self) -> bool:
+        """正在看的是“今天”而日期已过零点（例如程序开着过夜）：没有未保存的修改时自动换到新的今天。"""
+        today = QDate.currentDate()
+        if self._loaded_as_today and self._current_date != today and not self.has_unsaved_changes():
+            self._request_date(today)
+            return True
+        return False
+
     def showEvent(self, event) -> None:  # noqa: N802 - Qt API
-        if not self.has_unsaved_changes():
+        if not self.roll_over_to_today() and not self.has_unsaved_changes():
             self._load_current_date()
         super().showEvent(event)
         self._relayout_grids()

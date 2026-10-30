@@ -13,6 +13,7 @@
   {
    "formula": "营业额 - 成本",
    "valid": true,
+   "formatted": "营业额 - 成本",
    "variables_used": [
     "成本",
     "营业额"
@@ -22,6 +23,7 @@
   {
    "formula": "营业额 - 成本 + 零钱",
    "valid": true,
+   "formatted": "营业额 - 成本 + 零钱",
    "variables_used": [
     "成本",
     "营业额",
@@ -32,6 +34,7 @@
   {
    "formula": "(营业额 - 成本) * 0.9",
    "valid": true,
+   "formatted": "(营业额 - 成本) * 0.9",
    "variables_used": [
     "成本",
     "营业额"
@@ -41,6 +44,7 @@
   {
    "formula": "现金+微信-租金",
    "valid": true,
+   "formatted": "现金 + 微信 - 租金",
    "variables_used": [
     "微信",
     "现金",
@@ -51,6 +55,7 @@
   {
    "formula": "-营业额",
    "valid": true,
+   "formatted": "-营业额",
    "variables_used": [
     "营业额"
    ],
@@ -59,6 +64,7 @@
   {
    "formula": "+成本",
    "valid": true,
+   "formatted": "+成本",
    "variables_used": [
     "成本"
    ],
@@ -67,6 +73,7 @@
   {
    "formula": "--营业额",
    "valid": true,
+   "formatted": "--营业额",
    "variables_used": [
     "营业额"
    ],
@@ -75,36 +82,42 @@
   {
    "formula": "2*-3",
    "valid": true,
+   "formatted": "2 * -3",
    "variables_used": [],
    "result": -6.0
   },
   {
    "formula": "-2*3",
    "valid": true,
+   "formatted": "-2 * 3",
    "variables_used": [],
    "result": -6.0
   },
   {
    "formula": "1/3",
    "valid": true,
+   "formatted": "1 / 3",
    "variables_used": [],
    "result": 0.3333333333333333
   },
   {
    "formula": "10/4*2",
    "valid": true,
+   "formatted": "10 / 4 * 2",
    "variables_used": [],
    "result": 5.0
   },
   {
    "formula": "2*(3+4)*5",
    "valid": true,
+   "formatted": "2 * (3 + 4) * 5",
    "variables_used": [],
    "result": 70.0
   },
   {
    "formula": "((营业额))",
    "valid": true,
+   "formatted": "((营业额))",
    "variables_used": [
     "营业额"
    ],
@@ -113,6 +126,7 @@
   {
    "formula": "a*b_2-a/b_2",
    "valid": true,
+   "formatted": "a * b_2 - a / b_2",
    "variables_used": [
     "a",
     "b_2"
@@ -122,6 +136,7 @@
   {
    "formula": "1e3+营业额",
    "valid": true,
+   "formatted": "1e3 + 营业额",
    "variables_used": [
     "营业额"
    ],
@@ -130,90 +145,105 @@
   {
    "formula": "1_000 + 2",
    "valid": true,
+   "formatted": "1_000 + 2",
    "variables_used": [],
    "result": 1002.0
   },
   {
    "formula": ".5 + 0.25",
    "valid": true,
+   "formatted": ".5 + 0.25",
    "variables_used": [],
    "result": 0.75
   },
   {
    "formula": "3.",
    "valid": true,
+   "formatted": "3.",
    "variables_used": [],
    "result": 3.0
   },
   {
    "formula": "0.5",
    "valid": true,
+   "formatted": "0.5",
    "variables_used": [],
    "result": 0.5
   },
   {
    "formula": "00",
    "valid": true,
+   "formatted": "00",
    "variables_used": [],
    "result": 0.0
   },
   {
    "formula": "0",
    "valid": true,
+   "formatted": "0",
    "variables_used": [],
    "result": 0.0
   },
   {
    "formula": "007",
    "valid": false,
+   "formatted": "007",
    "error_kind": "syntax",
    "error": "公式语法错误：数字不能以 0 开头"
   },
   {
    "formula": "05 + 1",
    "valid": false,
+   "formatted": "05 + 1",
    "error_kind": "syntax",
    "error": "公式语法错误：数字不能以 0 开头"
   },
   {
    "formula": "1abc",
    "valid": false,
+   "formatted": "1abc",
    "error_kind": "syntax",
    "error": "公式语法错误：数字后面缺少运算符"
   },
   {
    "formula": "1 2",
    "valid": false,
+   "formatted": "1 2",
    "error_kind": "syntax",
    "error": "公式语法错误：写法有误，请检查运算符和括号"
   },
   {
    "formula": "营业额 成本",
    "valid": false,
+   "formatted": "营业额 成本",
    "error_kind": "syntax",
    "error": "公式语法错误：写法有误，请检查运算符和括号"
   },
   {
    "formula": "营业额 +",
    "valid": false,
+   "formatted": "营业额 +",
    "error_kind": "syntax",
    "error": "公式语法错误：写法有误，请检查运算符和括号"
   },
   {
    "formula": "(营业额 - 成本",
    "valid": false,
+   "formatted": "(营业额 - 成本",
    "error_kind": "syntax",
    "error": "公式语法错误：有括号没有闭合"
   },
   {
    "formula": "营业额 - 成本)",
    "valid": false,
+   "formatted": "营业额 - 成本)",
    "error_kind": "syntax",
    "error": "公式语法错误：多了右括号"
   },
   {
    "formula": "营业额 / 租金",
    "valid": true,
+   "formatted": "营业额 / 租金",
    "variables_used": [
     "租金",
     "营业额"
@@ -224,6 +254,7 @@
   {
    "formula": "未定义 + 1",
    "valid": true,
+   "formatted": "未定义 + 1",
    "variables_used": [
     "未定义"
    ],
@@ -233,90 +264,105 @@
   {
    "formula": "营业额 ** 2",
    "valid": false,
+   "formatted": "营业额 ** 2",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Pow），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 // 2",
    "valid": false,
+   "formatted": "营业额 // 2",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（FloorDiv），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 % 2",
    "valid": false,
+   "formatted": "营业额 % 2",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Mod），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 > 成本",
    "valid": false,
+   "formatted": "营业额 > 成本",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Compare），只支持四则运算和字段变量。"
   },
   {
    "formula": "abs(营业额)",
    "valid": false,
+   "formatted": "abs(营业额)",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Call），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额.real",
    "valid": false,
+   "formatted": "营业额.real",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Attribute），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额[0]",
    "valid": false,
+   "formatted": "营业额[0]",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Subscript），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额, 成本",
    "valid": false,
+   "formatted": "营业额, 成本",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Tuple），只支持四则运算和字段变量。"
   },
   {
    "formula": "~营业额",
    "valid": false,
+   "formatted": "~营业额",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Invert），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 & 1",
    "valid": false,
+   "formatted": "营业额 & 1",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（BitAnd），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 ^ 2",
    "valid": false,
+   "formatted": "营业额 ^ 2",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（BitXor），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 | 1",
    "valid": false,
+   "formatted": "营业额 | 1",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（BitOr），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 << 1",
    "valid": false,
+   "formatted": "营业额 << 1",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（LShift），只支持四则运算和字段变量。"
   },
   {
    "formula": "True + 1",
    "valid": true,
+   "formatted": "True + 1",
    "variables_used": [],
    "result": 2.0
   },
   {
    "formula": "None",
    "valid": true,
+   "formatted": "None",
    "variables_used": [],
    "error_kind": "nonnumeric",
    "error": "不支持非数字常量：None"
@@ -324,6 +370,7 @@
   {
    "formula": "1j",
    "valid": true,
+   "formatted": "1j",
    "variables_used": [],
    "error_kind": "nonnumeric",
    "error": "不支持非数字常量：1j"
@@ -331,30 +378,35 @@
   {
    "formula": "not 营业额",
    "valid": false,
+   "formatted": "not 营业额",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Not），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 and 成本",
    "valid": false,
+   "formatted": "营业额 and 成本",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（BoolOp），只支持四则运算和字段变量。"
   },
   {
    "formula": "",
    "valid": false,
+   "formatted": "",
    "error_kind": "empty",
    "error": "公式不能为空"
   },
   {
    "formula": "   ",
    "valid": false,
+   "formatted": "",
    "error_kind": "empty",
    "error": "公式不能为空"
   },
   {
    "formula": "营业额 - 成本 * 2 + 零钱 / 4 - (现金 - 微信) * 1.5",
    "valid": true,
+   "formatted": "营业额 - 成本 * 2 + 零钱 / 4 - (现金 - 微信) * 1.5",
    "variables_used": [
     "微信",
     "成本",
@@ -367,12 +419,14 @@
   {
    "formula": "0x1F + 1",
    "valid": true,
+   "formatted": "0x1F + 1",
    "variables_used": [],
    "result": 32.0
   },
   {
    "formula": "1e-2 * 营业额",
    "valid": true,
+   "formatted": "1e-2 * 营业额",
    "variables_used": [
     "营业额"
    ],
@@ -381,6 +435,7 @@
   {
    "formula": "营业额-成本",
    "valid": true,
+   "formatted": "营业额 - 成本",
    "variables_used": [
     "成本",
     "营业额"
@@ -390,6 +445,7 @@
   {
    "formula": "（营业额 - 成本）",
    "valid": true,
+   "formatted": "(营业额 - 成本)",
    "variables_used": [
     "成本",
     "营业额"
@@ -399,6 +455,7 @@
   {
    "formula": "a +\n b_2",
    "valid": true,
+   "formatted": "a + b_2",
    "variables_used": [
     "a",
     "b_2"
@@ -408,6 +465,7 @@
   {
    "formula": "现金×2÷4",
    "valid": true,
+   "formatted": "现金 * 2 / 4",
    "variables_used": [
     "现金"
    ],
@@ -416,12 +474,14 @@
   {
    "formula": "１２０＋３５",
    "valid": true,
+   "formatted": "120 + 35",
    "variables_used": [],
    "result": 155.0
   },
   {
    "formula": "营业额 − 成本",
    "valid": true,
+   "formatted": "营业额 - 成本",
    "variables_used": [
     "成本",
     "营业额"
@@ -431,6 +491,7 @@
   {
    "formula": "0。5 * a",
    "valid": true,
+   "formatted": "0.5 * a",
    "variables_used": [
     "a"
    ],
@@ -439,6 +500,7 @@
   {
    "formula": "ａ + 1",
    "valid": true,
+   "formatted": "a + 1",
    "variables_used": [
     "a"
    ],
@@ -447,66 +509,258 @@
   {
    "formula": "(营业额 - 成本",
    "valid": false,
+   "formatted": "(营业额 - 成本",
    "error_kind": "syntax",
    "error": "公式语法错误：有括号没有闭合"
   },
   {
    "formula": "营业额(",
    "valid": false,
+   "formatted": "营业额(",
    "error_kind": "syntax",
    "error": "公式语法错误：有括号没有闭合"
   },
   {
    "formula": "a ** 2 + abs(b_2)",
    "valid": false,
+   "formatted": "a ** 2 + abs(b_2)",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Call），只支持四则运算和字段变量。"
   },
   {
    "formula": "not a ** 2",
    "valid": false,
+   "formatted": "not a ** 2",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Not），只支持四则运算和字段变量。"
   },
   {
    "formula": "-a % 2 < 1",
    "valid": false,
+   "formatted": "-a % 2 < 1",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Compare），只支持四则运算和字段变量。"
   },
   {
    "formula": "(a, b_2)[0]",
    "valid": false,
+   "formatted": "(a, b_2)[0]",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Subscript），只支持四则运算和字段变量。"
   },
   {
    "formula": "a if b_2 else 1",
    "valid": false,
+   "formatted": "a if b_2 else 1",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（IfExp），只支持四则运算和字段变量。"
   },
   {
    "formula": "[a]",
    "valid": false,
+   "formatted": "[a]",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（List），只支持四则运算和字段变量。"
   },
   {
    "formula": "()",
    "valid": false,
+   "formatted": "()",
    "error_kind": "disallowed",
    "error": "公式包含不允许的操作（Tuple），只支持四则运算和字段变量。"
   },
   {
    "formula": "营业额 = 1",
    "valid": false,
+   "formatted": "营业额 = 1",
    "error_kind": "syntax",
    "error": "公式语法错误：写法有误，请检查运算符和括号"
   },
   {
+   "formula": "账户 +邮政账户 +  微信分 + 微信分欠",
+   "valid": true,
+   "formatted": "账户 + 邮政账户 + 微信分 + 微信分欠",
+   "variables_used": [
+    "微信分",
+    "微信分欠",
+    "账户",
+    "邮政账户"
+   ],
+   "error_kind": "undefined",
+   "error": "变量 '账户' 未在当日记录中定义，请先在录入页填写该字段。"
+  },
+  {
+   "formula": "（营业额-成本）×0.9",
+   "valid": true,
+   "formatted": "(营业额 - 成本) * 0.9",
+   "variables_used": [
+    "成本",
+    "营业额"
+   ],
+   "result": 810.225
+  },
+  {
+   "formula": "a--b_2",
+   "valid": true,
+   "formatted": "a - -b_2",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": 10.5
+  },
+  {
+   "formula": "a - - b_2",
+   "valid": true,
+   "formatted": "a - -b_2",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": 10.5
+  },
+  {
+   "formula": "-(a+b_2)",
+   "valid": true,
+   "formatted": "-(a + b_2)",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": -10.5
+  },
+  {
+   "formula": "+a",
+   "valid": true,
+   "formatted": "+a",
+   "variables_used": [
+    "a"
+   ],
+   "result": 3.0
+  },
+  {
+   "formula": "a*(-b_2)",
+   "valid": true,
+   "formatted": "a * (-b_2)",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": -22.5
+  },
+  {
+   "formula": "(  a  )",
+   "valid": true,
+   "formatted": "(a)",
+   "variables_used": [
+    "a"
+   ],
+   "result": 3.0
+  },
+  {
+   "formula": "a\t+　b_2",
+   "valid": true,
+   "formatted": "a + b_2",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": 10.5
+  },
+  {
+   "formula": "a+b_2 )",
+   "valid": false,
+   "formatted": "a+b_2 )",
+   "error_kind": "syntax",
+   "error": "公式语法错误：多了右括号"
+  },
+  {
+   "formula": "  营业额  -成本  ",
+   "valid": true,
+   "formatted": "营业额 - 成本",
+   "variables_used": [
+    "成本",
+    "营业额"
+   ],
+   "result": 900.25
+  },
+  {
+   "formula": "((a+b_2)*(a-b_2))/2",
+   "valid": true,
+   "formatted": "((a + b_2) * (a - b_2)) / 2",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": -23.625
+  },
+  {
+   "formula": "-a--a",
+   "valid": true,
+   "formatted": "-a - -a",
+   "variables_used": [
+    "a"
+   ],
+   "result": 0.0
+  },
+  {
+   "formula": "a*+b_2",
+   "valid": true,
+   "formatted": "a * +b_2",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": 22.5
+  },
+  {
+   "formula": "１２０ － ３５",
+   "valid": true,
+   "formatted": "120 - 35",
+   "variables_used": [],
+   "result": 85.0
+  },
+  {
+   "formula": "a + b_2",
+   "valid": true,
+   "formatted": "a + b_2",
+   "variables_used": [
+    "a",
+    "b_2"
+   ],
+   "result": 10.5
+  },
+  {
+   "formula": "True*a",
+   "valid": true,
+   "formatted": "True * a",
+   "variables_used": [
+    "a"
+   ],
+   "result": 3.0
+  },
+  {
+   "formula": "1j + a",
+   "valid": true,
+   "formatted": "1j + a",
+   "variables_used": [
+    "a"
+   ],
+   "error_kind": "nonnumeric",
+   "error": "不支持非数字常量：1j"
+  },
+  {
+   "formula": "None - 1",
+   "valid": true,
+   "formatted": "None - 1",
+   "variables_used": [],
+   "error_kind": "nonnumeric",
+   "error": "不支持非数字常量：None"
+  },
+  {
    "formula": "(租金 * b_2) / -微信 - 租金 + (租金 - 现金) - (成本 * b_2) * 零钱",
    "valid": true,
+   "formatted": "(租金 * b_2) / -微信 - 租金 + (租金 - 现金) - (成本 * b_2) * 零钱",
    "variables_used": [
     "b_2",
     "微信",
@@ -520,6 +774,7 @@
   {
    "formula": "b_2 + (41.37 * 微信) / b_2 - 82 * a / 营业额",
    "valid": true,
+   "formatted": "b_2 + (41.37 * 微信) / b_2 - 82 * a / 营业额",
    "variables_used": [
     "a",
     "b_2",
@@ -531,6 +786,7 @@
   {
    "formula": "租金 / a - 营业额 + -零钱 - 成本 / 成本",
    "valid": true,
+   "formatted": "租金 / a - 营业额 + -零钱 - 成本 / 成本",
    "variables_used": [
     "a",
     "成本",
@@ -543,6 +799,7 @@
   {
    "formula": "-微信 + 64 + 租金",
    "valid": true,
+   "formatted": "-微信 + 64 + 租金",
    "variables_used": [
     "微信",
     "租金"
@@ -552,6 +809,7 @@
   {
    "formula": "44.51 - 现金 - 成本 - -成本",
    "valid": true,
+   "formatted": "44.51 - 现金 - 成本 - -成本",
    "variables_used": [
     "成本",
     "现金"
@@ -561,6 +819,7 @@
   {
    "formula": "-营业额 * 零钱 - 微信",
    "valid": true,
+   "formatted": "-营业额 * 零钱 - 微信",
    "variables_used": [
     "微信",
     "营业额",
@@ -571,6 +830,7 @@
   {
    "formula": "营业额 + (-营业额 * 微信)",
    "valid": true,
+   "formatted": "营业额 + (-营业额 * 微信)",
    "variables_used": [
     "微信",
     "营业额"
@@ -580,6 +840,7 @@
   {
    "formula": "-微信 + 现金 / 成本 + 营业额 / 76 - -33.25 * 5.27",
    "valid": true,
+   "formatted": "-微信 + 现金 / 成本 + 营业额 / 76 - -33.25 * 5.27",
    "variables_used": [
     "微信",
     "成本",
@@ -591,6 +852,7 @@
   {
    "formula": "b_2 + 86 - 3.22 / a - 成本",
    "valid": true,
+   "formatted": "b_2 + 86 - 3.22 / a - 成本",
    "variables_used": [
     "a",
     "b_2",
@@ -601,6 +863,7 @@
   {
    "formula": "11.99 - 营业额 + 租金 / 现金 * 50 * 零钱",
    "valid": true,
+   "formatted": "11.99 - 营业额 + 租金 / 现金 * 50 * 零钱",
    "variables_used": [
     "现金",
     "租金",
@@ -612,6 +875,7 @@
   {
    "formula": "成本 + b_2 - (现金 + 租金) + 34.84 / 微信 / 租金 * 微信",
    "valid": true,
+   "formatted": "成本 + b_2 - (现金 + 租金) + 34.84 / 微信 / 租金 * 微信",
    "variables_used": [
     "b_2",
     "微信",
@@ -625,6 +889,7 @@
   {
    "formula": "(零钱 + a) / 营业额 - (成本 - 零钱) / (46.69 - 营业额) + 租金 + 零钱 * a",
    "valid": true,
+   "formatted": "(零钱 + a) / 营业额 - (成本 - 零钱) / (46.69 - 营业额) + 租金 + 零钱 * a",
    "variables_used": [
     "a",
     "成本",
@@ -637,6 +902,7 @@
   {
    "formula": "成本 / 营业额 * 27 / 98 + 微信 + (b_2 * b_2) + 97",
    "valid": true,
+   "formatted": "成本 / 营业额 * 27 / 98 + 微信 + (b_2 * b_2) + 97",
    "variables_used": [
     "b_2",
     "微信",
@@ -648,6 +914,7 @@
   {
    "formula": "现金 - a * 成本 * (租金 * b_2)",
    "valid": true,
+   "formatted": "现金 - a * 成本 * (租金 * b_2)",
    "variables_used": [
     "a",
     "b_2",
@@ -660,6 +927,7 @@
   {
    "formula": "微信 * 47 - a * 微信 + 成本 / b_2 - 23.94",
    "valid": true,
+   "formatted": "微信 * 47 - a * 微信 + 成本 / b_2 - 23.94",
    "variables_used": [
     "a",
     "b_2",
@@ -671,6 +939,7 @@
   {
    "formula": "(-17 - a) * b_2 * 微信 + -10.24 / (34.30 * b_2)",
    "valid": true,
+   "formatted": "(-17 - a) * b_2 * 微信 + -10.24 / (34.30 * b_2)",
    "variables_used": [
     "a",
     "b_2",
@@ -681,6 +950,7 @@
   {
    "formula": "微信 - (营业额 - 零钱) - (零钱 * 零钱) + 45.39 * 18.51 - (a + 租金)",
    "valid": true,
+   "formatted": "微信 - (营业额 - 零钱) - (零钱 * 零钱) + 45.39 * 18.51 - (a + 租金)",
    "variables_used": [
     "a",
     "微信",
@@ -693,6 +963,7 @@
   {
    "formula": "(-b_2 * 营业额) - 成本 + 15 * 租金 + 92",
    "valid": true,
+   "formatted": "(-b_2 * 营业额) - 成本 + 15 * 租金 + 92",
    "variables_used": [
     "b_2",
     "成本",
@@ -704,6 +975,7 @@
   {
    "formula": "a / (35.42 - 现金) + 71 * 42.96 / b_2",
    "valid": true,
+   "formatted": "a / (35.42 - 现金) + 71 * 42.96 / b_2",
    "variables_used": [
     "a",
     "b_2",
@@ -714,6 +986,7 @@
   {
    "formula": "-54 - 租金 - 成本 + 微信",
    "valid": true,
+   "formatted": "-54 - 租金 - 成本 + 微信",
    "variables_used": [
     "微信",
     "成本",
@@ -724,6 +997,7 @@
   {
    "formula": "成本 / (营业额 + 零钱)",
    "valid": true,
+   "formatted": "成本 / (营业额 + 零钱)",
    "variables_used": [
     "成本",
     "营业额",
@@ -734,6 +1008,7 @@
   {
    "formula": "租金 * -零钱 - 营业额 * 现金 + -零钱 + 8.53 - 租金",
    "valid": true,
+   "formatted": "租金 * -零钱 - 营业额 * 现金 + -零钱 + 8.53 - 租金",
    "variables_used": [
     "现金",
     "租金",
@@ -745,6 +1020,7 @@
   {
    "formula": "零钱 / -30.09 + -租金",
    "valid": true,
+   "formatted": "零钱 / -30.09 + -租金",
    "variables_used": [
     "租金",
     "零钱"
@@ -754,6 +1030,7 @@
   {
    "formula": "38 / 营业额 * -成本 * 87 + 成本",
    "valid": true,
+   "formatted": "38 / 营业额 * -成本 * 87 + 成本",
    "variables_used": [
     "成本",
     "营业额"
@@ -763,6 +1040,7 @@
   {
    "formula": "租金 / 营业额 + 成本 + (成本 * 现金) - 零钱 * 零钱",
    "valid": true,
+   "formatted": "租金 / 营业额 + 成本 + (成本 * 现金) - 零钱 * 零钱",
    "variables_used": [
     "成本",
     "现金",
@@ -775,6 +1053,7 @@
   {
    "formula": "营业额 + 微信 + b_2 * 营业额 - 微信 - 零钱",
    "valid": true,
+   "formatted": "营业额 + 微信 + b_2 * 营业额 - 微信 - 零钱",
    "variables_used": [
     "b_2",
     "微信",
@@ -786,6 +1065,7 @@
   {
    "formula": "(营业额 * 营业额) / a",
    "valid": true,
+   "formatted": "(营业额 * 营业额) / a",
    "variables_used": [
     "a",
     "营业额"
@@ -795,6 +1075,7 @@
   {
    "formula": "(营业额 - 租金) + 零钱",
    "valid": true,
+   "formatted": "(营业额 - 租金) + 零钱",
    "variables_used": [
     "租金",
     "营业额",
@@ -805,6 +1086,7 @@
   {
    "formula": "现金 / 48.93 * (成本 - a) / 成本 + 零钱 + 成本 / -b_2",
    "valid": true,
+   "formatted": "现金 / 48.93 * (成本 - a) / 成本 + 零钱 + 成本 / -b_2",
    "variables_used": [
     "a",
     "b_2",
@@ -817,6 +1099,7 @@
   {
    "formula": "零钱 * (42 * 微信) / b_2 * -现金 + -a / 现金",
    "valid": true,
+   "formatted": "零钱 * (42 * 微信) / b_2 * -现金 + -a / 现金",
    "variables_used": [
     "a",
     "b_2",
@@ -829,6 +1112,7 @@
   {
    "formula": "(-12.50 + 成本) - a",
    "valid": true,
+   "formatted": "(-12.50 + 成本) - a",
    "variables_used": [
     "a",
     "成本"
@@ -838,6 +1122,7 @@
   {
    "formula": "(-营业额 - 营业额) / a + (成本 - a) + (营业额 - 营业额) / 零钱 - 租金 + 成本",
    "valid": true,
+   "formatted": "(-营业额 - 营业额) / a + (成本 - a) + (营业额 - 营业额) / 零钱 - 租金 + 成本",
    "variables_used": [
     "a",
     "成本",
@@ -850,6 +1135,7 @@
   {
    "formula": "零钱 + 36.68 - -租金 - a * 微信 * 成本 - (38.91 * b_2)",
    "valid": true,
+   "formatted": "零钱 + 36.68 - -租金 - a * 微信 * 成本 - (38.91 * b_2)",
    "variables_used": [
     "a",
     "b_2",
@@ -863,6 +1149,7 @@
   {
    "formula": "0.74 * (现金 + 成本) + b_2 * b_2",
    "valid": true,
+   "formatted": "0.74 * (现金 + 成本) + b_2 * b_2",
    "variables_used": [
     "b_2",
     "成本",
@@ -873,6 +1160,7 @@
   {
    "formula": "(成本 * b_2) - 微信 / 成本 * (a - 微信) * -5.23 + 成本",
    "valid": true,
+   "formatted": "(成本 * b_2) - 微信 / 成本 * (a - 微信) * -5.23 + 成本",
    "variables_used": [
     "a",
     "b_2",
@@ -884,6 +1172,7 @@
   {
    "formula": "成本 / 现金 - b_2 - 微信 + (b_2 - 零钱)",
    "valid": true,
+   "formatted": "成本 / 现金 - b_2 - 微信 + (b_2 - 零钱)",
    "variables_used": [
     "b_2",
     "微信",
@@ -896,6 +1185,7 @@
   {
    "formula": "微信 + a / 现金 - 租金 / 成本",
    "valid": true,
+   "formatted": "微信 + a / 现金 - 租金 / 成本",
    "variables_used": [
     "a",
     "微信",
@@ -908,6 +1198,7 @@
   {
    "formula": "(零钱 * 零钱) + 成本 + a + (-b_2 + 营业额) - 营业额 / 营业额",
    "valid": true,
+   "formatted": "(零钱 * 零钱) + 成本 + a + (-b_2 + 营业额) - 营业额 / 营业额",
    "variables_used": [
     "a",
     "b_2",
@@ -920,6 +1211,7 @@
   {
    "formula": "成本 + 零钱 + 租金 * 营业额 / 61 + (a * a) + 零钱",
    "valid": true,
+   "formatted": "成本 + 零钱 + 租金 * 营业额 / 61 + (a * a) + 零钱",
    "variables_used": [
     "a",
     "成本",
@@ -932,6 +1224,7 @@
   {
    "formula": "营业额 * 3",
    "valid": true,
+   "formatted": "营业额 * 3",
    "variables_used": [
     "营业额"
    ],
@@ -940,6 +1233,7 @@
   {
    "formula": "b_2 * 86 / 43.66 + 34.59",
    "valid": true,
+   "formatted": "b_2 * 86 / 43.66 + 34.59",
    "variables_used": [
     "b_2"
    ],
@@ -948,6 +1242,7 @@
   {
    "formula": "租金 - b_2 / a + (a + 租金) * -b_2",
    "valid": true,
+   "formatted": "租金 - b_2 / a + (a + 租金) * -b_2",
    "variables_used": [
     "a",
     "b_2",
@@ -958,6 +1253,7 @@
   {
    "formula": "(微信 * b_2) * 租金 - 零钱 + 48.40 * -现金 + 现金",
    "valid": true,
+   "formatted": "(微信 * b_2) * 租金 - 零钱 + 48.40 * -现金 + 现金",
    "variables_used": [
     "b_2",
     "微信",
@@ -970,6 +1266,7 @@
   {
    "formula": "b_2 * (b_2 * a) * 零钱 + a - 93 / b_2",
    "valid": true,
+   "formatted": "b_2 * (b_2 * a) * 零钱 + a - 93 / b_2",
    "variables_used": [
     "a",
     "b_2",
@@ -980,6 +1277,7 @@
   {
    "formula": "成本 / (现金 - 零钱) + 微信 - 营业额 + b_2 + b_2",
    "valid": true,
+   "formatted": "成本 / (现金 - 零钱) + 微信 - 营业额 + b_2 + b_2",
    "variables_used": [
     "b_2",
     "微信",
@@ -993,6 +1291,7 @@
   {
    "formula": "21 * 零钱 / 成本 - 营业额 / -租金 * 成本 * (b_2 + 成本)",
    "valid": true,
+   "formatted": "21 * 零钱 / 成本 - 营业额 / -租金 * 成本 * (b_2 + 成本)",
    "variables_used": [
     "b_2",
     "成本",
@@ -1006,6 +1305,7 @@
   {
    "formula": "零钱 * 35.11 + a * a * 租金",
    "valid": true,
+   "formatted": "零钱 * 35.11 + a * a * 租金",
    "variables_used": [
     "a",
     "租金",
@@ -1016,6 +1316,7 @@
   {
    "formula": "26.59 / (-租金 + b_2)",
    "valid": true,
+   "formatted": "26.59 / (-租金 + b_2)",
    "variables_used": [
     "b_2",
     "租金"
@@ -1025,6 +1326,7 @@
   {
    "formula": "(零钱 * 租金) + (a + 成本) / 营业额",
    "valid": true,
+   "formatted": "(零钱 * 租金) + (a + 成本) / 营业额",
    "variables_used": [
     "a",
     "成本",
@@ -1037,6 +1339,7 @@
   {
    "formula": "微信 * (租金 * 微信) * 营业额 + 64 - b_2 / 营业额 / 成本",
    "valid": true,
+   "formatted": "微信 * (租金 * 微信) * 营业额 + 64 - b_2 / 营业额 / 成本",
    "variables_used": [
     "b_2",
     "微信",
@@ -1049,6 +1352,7 @@
   {
    "formula": "-零钱 * 零钱 - (19 * 微信) * 微信",
    "valid": true,
+   "formatted": "-零钱 * 零钱 - (19 * 微信) * 微信",
    "variables_used": [
     "微信",
     "零钱"
@@ -1058,6 +1362,7 @@
   {
    "formula": "营业额 + -a - -b_2",
    "valid": true,
+   "formatted": "营业额 + -a - -b_2",
    "variables_used": [
     "a",
     "b_2",
@@ -1068,6 +1373,7 @@
   {
    "formula": "-微信 - 营业额 / 租金 / 微信 + (76 + a) + 微信 + b_2",
    "valid": true,
+   "formatted": "-微信 - 营业额 / 租金 / 微信 + (76 + a) + 微信 + b_2",
    "variables_used": [
     "a",
     "b_2",
@@ -1081,6 +1387,7 @@
   {
    "formula": "(-营业额 * a) / (69 * 租金) / 微信 + (53 + 零钱) * a",
    "valid": true,
+   "formatted": "(-营业额 * a) / (69 * 租金) / 微信 + (53 + 零钱) * a",
    "variables_used": [
     "a",
     "微信",
@@ -1094,6 +1401,7 @@
   {
    "formula": "49.33 / 微信 - (b_2 - 成本) + 零钱 / (微信 * b_2) + 14 * (零钱 + 现金)",
    "valid": true,
+   "formatted": "49.33 / 微信 - (b_2 - 成本) + 零钱 / (微信 * b_2) + 14 * (零钱 + 现金)",
    "variables_used": [
     "b_2",
     "微信",
@@ -1106,6 +1414,7 @@
   {
    "formula": "80 * 7.39 * 零钱 + 租金 * 零钱 - 成本 + 微信",
    "valid": true,
+   "formatted": "80 * 7.39 * 零钱 + 租金 * 零钱 - 成本 + 微信",
    "variables_used": [
     "微信",
     "成本",
@@ -1117,6 +1426,7 @@
   {
    "formula": "(零钱 + 现金) * (现金 - 现金) + -现金 * (零钱 - a) / 租金 * 微信 * 成本",
    "valid": true,
+   "formatted": "(零钱 + 现金) * (现金 - 现金) + -现金 * (零钱 - a) / 租金 * 微信 * 成本",
    "variables_used": [
     "a",
     "微信",
@@ -1131,6 +1441,7 @@
   {
    "formula": "现金 * (87 * 零钱) - 成本 - 租金 + 微信 * a",
    "valid": true,
+   "formatted": "现金 * (87 * 零钱) - 成本 - 租金 + 微信 * a",
    "variables_used": [
     "a",
     "微信",
@@ -1144,6 +1455,7 @@
   {
    "formula": "-20.99 + -营业额 / 零钱 * 0.92 * 微信 * 现金",
    "valid": true,
+   "formatted": "-20.99 + -营业额 / 零钱 * 0.92 * 微信 * 现金",
    "variables_used": [
     "微信",
     "现金",
@@ -1155,6 +1467,7 @@
   {
    "formula": "b_2 * 微信 - 13.04 - a * 零钱 - 成本 * 微信",
    "valid": true,
+   "formatted": "b_2 * 微信 - 13.04 - a * 零钱 - 成本 * 微信",
    "variables_used": [
     "a",
     "b_2",
@@ -1167,6 +1480,7 @@
   {
    "formula": "-现金 + -33.11 - 成本",
    "valid": true,
+   "formatted": "-现金 + -33.11 - 成本",
    "variables_used": [
     "成本",
     "现金"
@@ -1176,6 +1490,7 @@
   {
    "formula": "88 * 现金 / 现金 - 零钱 * 现金 / -零钱",
    "valid": true,
+   "formatted": "88 * 现金 / 现金 - 零钱 * 现金 / -零钱",
    "variables_used": [
     "现金",
     "零钱"
@@ -1185,6 +1500,7 @@
   {
    "formula": "租金 / 租金 * (零钱 - 现金) + (成本 + 成本)",
    "valid": true,
+   "formatted": "租金 / 租金 * (零钱 - 现金) + (成本 + 成本)",
    "variables_used": [
     "成本",
     "现金",
@@ -1197,6 +1513,7 @@
   {
    "formula": "成本 + 微信 * -租金 + 成本 + -现金",
    "valid": true,
+   "formatted": "成本 + 微信 * -租金 + 成本 + -现金",
    "variables_used": [
     "微信",
     "成本",
@@ -1208,6 +1525,7 @@
   {
    "formula": "(60 + 租金) * (35.33 - a)",
    "valid": true,
+   "formatted": "(60 + 租金) * (35.33 - a)",
    "variables_used": [
     "a",
     "租金"
@@ -1217,6 +1535,7 @@
   {
    "formula": "1.80 - a * (现金 - b_2) - 现金 + (-6.61 - 零钱) - a * -微信",
    "valid": true,
+   "formatted": "1.80 - a * (现金 - b_2) - 现金 + (-6.61 - 零钱) - a * -微信",
    "variables_used": [
     "a",
     "b_2",
@@ -1229,6 +1548,7 @@
   {
    "formula": "-现金 / 61 / -零钱 * 现金 + 租金 / 零钱",
    "valid": true,
+   "formatted": "-现金 / 61 / -零钱 * 现金 + 租金 / 零钱",
    "variables_used": [
     "现金",
     "租金",
@@ -1239,6 +1559,7 @@
   {
    "formula": "(a + 营业额) * b_2 - 4.03 + 成本 * 36.53",
    "valid": true,
+   "formatted": "(a + 营业额) * b_2 - 4.03 + 成本 * 36.53",
    "variables_used": [
     "a",
     "b_2",
@@ -1250,6 +1571,7 @@
   {
    "formula": "-现金 + b_2 / 营业额 * a / a / -微信 + 46.51",
    "valid": true,
+   "formatted": "-现金 + b_2 / 营业额 * a / a / -微信 + 46.51",
    "variables_used": [
     "a",
     "b_2",
@@ -1262,6 +1584,7 @@
   {
    "formula": "微信 * 现金 * b_2",
    "valid": true,
+   "formatted": "微信 * 现金 * b_2",
    "variables_used": [
     "b_2",
     "微信",
@@ -1272,6 +1595,7 @@
   {
    "formula": "零钱 * -64",
    "valid": true,
+   "formatted": "零钱 * -64",
    "variables_used": [
     "零钱"
    ],
@@ -1280,6 +1604,7 @@
   {
    "formula": "-b_2 * 零钱",
    "valid": true,
+   "formatted": "-b_2 * 零钱",
    "variables_used": [
     "b_2",
     "零钱"
@@ -1289,6 +1614,7 @@
   {
    "formula": "成本 + (-a * a)",
    "valid": true,
+   "formatted": "成本 + (-a * a)",
    "variables_used": [
     "a",
     "成本"
@@ -1298,6 +1624,7 @@
   {
    "formula": "-a / b_2 * -61",
    "valid": true,
+   "formatted": "-a / b_2 * -61",
    "variables_used": [
     "a",
     "b_2"
@@ -1307,6 +1634,7 @@
   {
    "formula": "83 / 租金 - 36 - a / 租金 / 微信",
    "valid": true,
+   "formatted": "83 / 租金 - 36 - a / 租金 / 微信",
    "variables_used": [
     "a",
     "微信",
@@ -1318,6 +1646,7 @@
   {
    "formula": "2.17 * b_2 * 微信 - 成本 / 15.06 - b_2 / b_2",
    "valid": true,
+   "formatted": "2.17 * b_2 * 微信 - 成本 / 15.06 - b_2 / b_2",
    "variables_used": [
     "b_2",
     "微信",
@@ -1328,6 +1657,7 @@
   {
    "formula": "-成本 - 现金 + 现金 / 营业额 + 现金 + 44 / (现金 - 零钱)",
    "valid": true,
+   "formatted": "-成本 - 现金 + 现金 / 营业额 + 现金 + 44 / (现金 - 零钱)",
    "variables_used": [
     "成本",
     "现金",
@@ -1339,6 +1669,7 @@
   {
    "formula": "23.10 * (b_2 * 现金) * (租金 + 营业额) * a",
    "valid": true,
+   "formatted": "23.10 * (b_2 * 现金) * (租金 + 营业额) * a",
    "variables_used": [
     "a",
     "b_2",
@@ -1351,6 +1682,7 @@
   {
    "formula": "9.62 * b_2",
    "valid": true,
+   "formatted": "9.62 * b_2",
    "variables_used": [
     "b_2"
    ],
@@ -1359,6 +1691,7 @@
   {
    "formula": "(微信 + a) + b_2 * (成本 * b_2) - 微信 * 营业额 + a",
    "valid": true,
+   "formatted": "(微信 + a) + b_2 * (成本 * b_2) - 微信 * 营业额 + a",
    "variables_used": [
     "a",
     "b_2",
@@ -1371,6 +1704,7 @@
   {
    "formula": "88 / 35 * -现金 - b_2 * 零钱 * -营业额",
    "valid": true,
+   "formatted": "88 / 35 * -现金 - b_2 * 零钱 * -营业额",
    "variables_used": [
     "b_2",
     "现金",
@@ -1382,6 +1716,7 @@
   {
    "formula": "租金 / 现金 - 成本 / (-现金 + 租金) / (租金 + 成本) - a",
    "valid": true,
+   "formatted": "租金 / 现金 - 成本 / (-现金 + 租金) / (租金 + 成本) - a",
    "variables_used": [
     "a",
     "成本",
@@ -1393,6 +1728,7 @@
   {
    "formula": "营业额 / (38.93 + 微信) / (成本 * b_2) + 15 * (-a + 零钱)",
    "valid": true,
+   "formatted": "营业额 / (38.93 + 微信) / (成本 * b_2) + 15 * (-a + 零钱)",
    "variables_used": [
     "a",
     "b_2",
@@ -1406,6 +1742,7 @@
   {
    "formula": "a + 现金 + 成本 * -a",
    "valid": true,
+   "formatted": "a + 现金 + 成本 * -a",
    "variables_used": [
     "a",
     "成本",
@@ -1416,6 +1753,7 @@
   {
    "formula": "21.22 * 50 + a",
    "valid": true,
+   "formatted": "21.22 * 50 + a",
    "variables_used": [
     "a"
    ],
@@ -1424,6 +1762,7 @@
   {
    "formula": "成本 / (3 + 成本) - (a * 现金)",
    "valid": true,
+   "formatted": "成本 / (3 + 成本) - (a * 现金)",
    "variables_used": [
     "a",
     "成本",
@@ -1434,6 +1773,7 @@
   {
    "formula": "营业额 / b_2 / 营业额",
    "valid": true,
+   "formatted": "营业额 / b_2 / 营业额",
    "variables_used": [
     "b_2",
     "营业额"
@@ -1443,6 +1783,7 @@
   {
    "formula": "(微信 + 租金) * 7 + 零钱",
    "valid": true,
+   "formatted": "(微信 + 租金) * 7 + 零钱",
    "variables_used": [
     "微信",
     "租金",
@@ -1453,6 +1794,7 @@
   {
    "formula": "43.34 - b_2 / 租金 / (成本 - 营业额) - 现金 + b_2 + 25.57",
    "valid": true,
+   "formatted": "43.34 - b_2 / 租金 / (成本 - 营业额) - 现金 + b_2 + 25.57",
    "variables_used": [
     "b_2",
     "成本",
@@ -1466,6 +1808,7 @@
   {
    "formula": "成本 / 营业额 + 微信",
    "valid": true,
+   "formatted": "成本 / 营业额 + 微信",
    "variables_used": [
     "微信",
     "成本",
@@ -1476,6 +1819,7 @@
   {
    "formula": "租金 - b_2",
    "valid": true,
+   "formatted": "租金 - b_2",
    "variables_used": [
     "b_2",
     "租金"
@@ -1485,6 +1829,7 @@
   {
    "formula": "b_2 / 现金 * 成本 + 37 - (-零钱 - 零钱)",
    "valid": true,
+   "formatted": "b_2 / 现金 * 成本 + 37 - (-零钱 - 零钱)",
    "variables_used": [
     "b_2",
     "成本",
@@ -1496,6 +1841,7 @@
   {
    "formula": "8.56 * -租金 / (现金 + 现金) * b_2 + b_2 + 零钱",
    "valid": true,
+   "formatted": "8.56 * -租金 / (现金 + 现金) * b_2 + b_2 + 零钱",
    "variables_used": [
     "b_2",
     "现金",
@@ -1507,6 +1853,7 @@
   {
    "formula": "成本 + 微信 + 微信 / b_2 / a",
    "valid": true,
+   "formatted": "成本 + 微信 + 微信 / b_2 / a",
    "variables_used": [
     "a",
     "b_2",
@@ -1518,6 +1865,7 @@
   {
    "formula": "b_2 - -零钱 * (微信 - 租金) * 租金 + a - 16.22 + (a * 微信)",
    "valid": true,
+   "formatted": "b_2 - -零钱 * (微信 - 租金) * 租金 + a - 16.22 + (a * 微信)",
    "variables_used": [
     "a",
     "b_2",
@@ -1530,6 +1878,7 @@
   {
    "formula": "零钱 + 营业额 * 营业额",
    "valid": true,
+   "formatted": "零钱 + 营业额 * 营业额",
    "variables_used": [
     "营业额",
     "零钱"
@@ -1539,6 +1888,7 @@
   {
    "formula": "微信 + -现金 / 成本 - 租金",
    "valid": true,
+   "formatted": "微信 + -现金 / 成本 - 租金",
    "variables_used": [
     "微信",
     "成本",
@@ -1550,6 +1900,7 @@
   {
    "formula": "零钱 * (成本 * 微信) * (租金 - b_2) - 营业额 / 微信",
    "valid": true,
+   "formatted": "零钱 * (成本 * 微信) * (租金 - b_2) - 营业额 / 微信",
    "variables_used": [
     "b_2",
     "微信",
@@ -1563,6 +1914,7 @@
   {
    "formula": "38.27 + 租金 - b_2",
    "valid": true,
+   "formatted": "38.27 + 租金 - b_2",
    "variables_used": [
     "b_2",
     "租金"
@@ -1572,6 +1924,7 @@
   {
    "formula": "营业额 + 营业额 - 8.57 / a + -营业额",
    "valid": true,
+   "formatted": "营业额 + 营业额 - 8.57 / a + -营业额",
    "variables_used": [
     "a",
     "营业额"
@@ -1581,6 +1934,7 @@
   {
    "formula": "微信 * b_2",
    "valid": true,
+   "formatted": "微信 * b_2",
    "variables_used": [
     "b_2",
     "微信"
@@ -1590,6 +1944,7 @@
   {
    "formula": "-微信 + (-微信 * b_2) + (现金 + 零钱) + 现金",
    "valid": true,
+   "formatted": "-微信 + (-微信 * b_2) + (现金 + 零钱) + 现金",
    "variables_used": [
     "b_2",
     "微信",
@@ -1601,6 +1956,7 @@
   {
    "formula": "租金 + 微信 / -零钱 * a / -零钱 * 10 - (成本 - 成本)",
    "valid": true,
+   "formatted": "租金 + 微信 / -零钱 * a / -零钱 * 10 - (成本 - 成本)",
    "variables_used": [
     "a",
     "微信",
@@ -1613,6 +1969,7 @@
   {
    "formula": "b_2 - a * (营业额 - a) / a - 现金 * (b_2 - 租金) / (b_2 * 租金)",
    "valid": true,
+   "formatted": "b_2 - a * (营业额 - a) / a - 现金 * (b_2 - 租金) / (b_2 * 租金)",
    "variables_used": [
     "a",
     "b_2",
@@ -1626,6 +1983,7 @@
   {
    "formula": "成本 + a / 68 * a",
    "valid": true,
+   "formatted": "成本 + a / 68 * a",
    "variables_used": [
     "a",
     "成本"
@@ -1635,6 +1993,7 @@
   {
    "formula": "营业额 + 零钱 * (-微信 - 租金) * a + (成本 + 现金) / (b_2 - 零钱)",
    "valid": true,
+   "formatted": "营业额 + 零钱 * (-微信 - 租金) * a + (成本 + 现金) / (b_2 - 零钱)",
    "variables_used": [
     "a",
     "b_2",
@@ -1650,6 +2009,7 @@
   {
    "formula": "零钱 + 成本 / (现金 - 微信) + 零钱 / (-微信 * 现金) * -a - a",
    "valid": true,
+   "formatted": "零钱 + 成本 / (现金 - 微信) + 零钱 / (-微信 * 现金) * -a - a",
    "variables_used": [
     "a",
     "微信",
@@ -1662,6 +2022,7 @@
   {
    "formula": "(成本 - 租金) / (10 + 现金) + a / a / (75 + 现金) / 现金 / 35.38",
    "valid": true,
+   "formatted": "(成本 - 租金) / (10 + 现金) + a / a / (75 + 现金) / 现金 / 35.38",
    "variables_used": [
     "a",
     "成本",
@@ -1673,6 +2034,7 @@
   {
    "formula": "零钱 + a / (b_2 - a) - 44.64 / 租金 + 成本",
    "valid": true,
+   "formatted": "零钱 + a / (b_2 - a) - 44.64 / 租金 + 成本",
    "variables_used": [
     "a",
     "b_2",
@@ -1686,6 +2048,7 @@
   {
    "formula": "营业额 / (零钱 * 微信)",
    "valid": true,
+   "formatted": "营业额 / (零钱 * 微信)",
    "variables_used": [
     "微信",
     "营业额",
@@ -1696,6 +2059,7 @@
   {
    "formula": "微信 / 零钱 * 成本",
    "valid": true,
+   "formatted": "微信 / 零钱 * 成本",
    "variables_used": [
     "微信",
     "成本",
@@ -1706,6 +2070,7 @@
   {
    "formula": "营业额 * -营业额 + 租金 + b_2",
    "valid": true,
+   "formatted": "营业额 * -营业额 + 租金 + b_2",
    "variables_used": [
     "b_2",
     "租金",
@@ -1716,6 +2081,7 @@
   {
    "formula": "成本 - b_2 * 25.90 * 零钱 * b_2",
    "valid": true,
+   "formatted": "成本 - b_2 * 25.90 * 零钱 * b_2",
    "variables_used": [
     "b_2",
     "成本",
@@ -1726,6 +2092,7 @@
   {
    "formula": "微信 * b_2 * 微信 * 微信 + -b_2 + -微信",
    "valid": true,
+   "formatted": "微信 * b_2 * 微信 * 微信 + -b_2 + -微信",
    "variables_used": [
     "b_2",
     "微信"
@@ -1735,6 +2102,7 @@
   {
    "formula": "(b_2 + 零钱) + 租金 - 零钱 - -营业额 - 41.03 * (现金 + b_2)",
    "valid": true,
+   "formatted": "(b_2 + 零钱) + 租金 - 零钱 - -营业额 - 41.03 * (现金 + b_2)",
    "variables_used": [
     "b_2",
     "现金",
@@ -1747,6 +2115,7 @@
   {
    "formula": "(29.30 - 微信) * (0.78 + 营业额) / 营业额 - (零钱 - 成本) - 现金 + 成本 + a",
    "valid": true,
+   "formatted": "(29.30 - 微信) * (0.78 + 营业额) / 营业额 - (零钱 - 成本) - 现金 + 成本 + a",
    "variables_used": [
     "a",
     "微信",
@@ -1760,6 +2129,7 @@
   {
    "formula": "a + (a + 微信) - -微信 * 零钱 + 零钱 - (营业额 * 成本)",
    "valid": true,
+   "formatted": "a + (a + 微信) - -微信 * 零钱 + 零钱 - (营业额 * 成本)",
    "variables_used": [
     "a",
     "微信",
@@ -1772,6 +2142,7 @@
   {
    "formula": "成本 * 84 * -58 - (42.37 * 微信) + 租金 + 零钱",
    "valid": true,
+   "formatted": "成本 * 84 * -58 - (42.37 * 微信) + 租金 + 零钱",
    "variables_used": [
     "微信",
     "成本",
@@ -1783,6 +2154,7 @@
   {
    "formula": "微信 * 40.83 / a * -b_2 + b_2 - (a * 微信) + 现金",
    "valid": true,
+   "formatted": "微信 * 40.83 / a * -b_2 + b_2 - (a * 微信) + 现金",
    "variables_used": [
     "a",
     "b_2",
@@ -1794,6 +2166,7 @@
   {
    "formula": "营业额 * 28 + 现金 * 成本 + 现金 / (现金 * 成本) - 8.26",
    "valid": true,
+   "formatted": "营业额 * 28 + 现金 * 成本 + 现金 / (现金 * 成本) - 8.26",
    "variables_used": [
     "成本",
     "现金",
@@ -1858,5 +2231,246 @@
    "旧字段": 9.5
   },
   "result": 2319.0
- }
+ },
+ "migrate_cases": [
+  {
+   "raw": {
+    "营业额": {
+     "账户": 5.0,
+     "现金": 2.0
+    },
+    "成本": {
+     "进货": 1.0
+    },
+    "零钱": 3.0
+   },
+   "parent_renames": {
+    "成本": "进货成本"
+   },
+   "child_renames": {
+    "营业额": {
+     "账户": "银行账户"
+    }
+   },
+   "expected": {
+    "营业额": {
+     "银行账户": 5.0,
+     "现金": 2.0
+    },
+    "进货成本": {
+     "进货": 1.0
+    },
+    "零钱": 3.0
+   }
+  },
+  {
+   "raw": {
+    "营业额": {
+     "账户": 5.0
+    },
+    "收入": {
+     "现金": 2.0
+    }
+   },
+   "parent_renames": {
+    "收入": "营业额"
+   },
+   "child_renames": {},
+   "expected": {
+    "营业额": {
+     "账户": 5.0,
+     "现金": 2.0
+    }
+   }
+  },
+  {
+   "raw": {
+    "甲": 1.0,
+    "乙": 2.0
+   },
+   "parent_renames": {
+    "甲": "乙",
+    "乙": "甲"
+   },
+   "child_renames": {},
+   "expected": {
+    "乙": 1.0,
+    "甲": 2.0
+   }
+  },
+  {
+   "raw": {
+    "营业额": {
+     "账户": 5.0,
+     "现金": 2.0
+    }
+   },
+   "parent_renames": {
+    "营业额": "收入"
+   },
+   "child_renames": {
+    "收入": {
+     "现金": "现金收入"
+    }
+   },
+   "expected": {
+    "收入": {
+     "账户": 5.0,
+     "现金收入": 2.0
+    }
+   }
+  },
+  {
+   "raw": {},
+   "parent_renames": {
+    "营业额": "收入"
+   },
+   "child_renames": {},
+   "expected": {}
+  }
+ ],
+ "merge_cases": [
+  {
+   "previous": {
+    "营业额": {
+     "账户": 1.0,
+     "旧子项": 9.0
+    },
+    "旧分类": 3.0,
+    "零钱": 1.0
+   },
+   "collected": {
+    "营业额": {
+     "账户": 2.0,
+     "现金": 0.0
+    },
+    "成本": {
+     "进货": 4.0
+    },
+    "零钱": 0.0
+   },
+   "tree": [
+    {
+     "name": "营业额",
+     "children": [
+      "账户",
+      "现金"
+     ]
+    },
+    {
+     "name": "成本",
+     "children": [
+      "进货"
+     ]
+    },
+    {
+     "name": "零钱",
+     "children": []
+    }
+   ],
+   "expected": {
+    "营业额": {
+     "账户": 2.0,
+     "现金": 0.0,
+     "旧子项": 9.0
+    },
+    "成本": {
+     "进货": 4.0
+    },
+    "零钱": 0.0,
+    "旧分类": 3.0
+   }
+  },
+  {
+   "previous": {},
+   "collected": {
+    "营业额": {
+     "账户": 2.0,
+     "现金": 1.0
+    },
+    "成本": {
+     "进货": 0.0
+    },
+    "零钱": 5.0
+   },
+   "tree": [
+    {
+     "name": "营业额",
+     "children": [
+      "账户",
+      "现金"
+     ]
+    },
+    {
+     "name": "成本",
+     "children": [
+      "进货"
+     ]
+    },
+    {
+     "name": "零钱",
+     "children": []
+    }
+   ],
+   "expected": {
+    "营业额": {
+     "账户": 2.0,
+     "现金": 1.0
+    },
+    "成本": {
+     "进货": 0.0
+    },
+    "零钱": 5.0
+   }
+  },
+  {
+   "previous": {
+    "营业额": 7.0,
+    "成本": {
+     "进货": 1.0,
+     "运费": 2.0
+    }
+   },
+   "collected": {
+    "营业额": {
+     "账户": 0.0,
+     "现金": 0.0
+    },
+    "成本": {
+     "进货": 3.0
+    },
+    "零钱": 0.0
+   },
+   "tree": [
+    {
+     "name": "营业额",
+     "children": [
+      "账户",
+      "现金"
+     ]
+    },
+    {
+     "name": "成本",
+     "children": [
+      "进货"
+     ]
+    },
+    {
+     "name": "零钱",
+     "children": []
+    }
+   ],
+   "expected": {
+    "营业额": {
+     "账户": 0.0,
+     "现金": 0.0
+    },
+    "成本": {
+     "进货": 3.0,
+     "运费": 2.0
+    },
+    "零钱": 0.0
+   }
+  }
+ ]
 }

@@ -74,12 +74,13 @@ class PresetRotationTests(unittest.TestCase):
         self._write_preset("https://example.com:28443", "PH-NEW")
         self.assertTrue(preset.apply_preset_if_needed(self.engine))
 
-    def test_disconnect_disables_preset(self):
-        self._write_preset("https://example.com:28443", "PH-OLD")
-        preset.apply_preset_if_needed(self.engine)
-        self.db.forget_sync_server()
-        self.db.set_sync_meta("preset_disabled", "1")
-        self.assertFalse(preset.apply_preset_if_needed(self.engine))
+    def test_redetect_replaces_old_manual_connection(self):
+        self.engine.save_config(SyncConfig("https://example.com:28443", "PH-MANUAL"))
+        self.db.set_sync_meta("config_source", "manual")
+        self._write_preset("https://example.com:28443", "PH-NEW")
+        self.assertTrue(preset.apply_preset_if_needed(self.engine, force=True))  # 设置里点了“重新检测”
+        self.assertEqual(self.engine.load_config().token, "PH-NEW")
+        self.assertEqual(self.db.get_sync_meta("config_source"), "preset")
 
 
 @unittest.skipIf(QApplication is None, "需要 PySide6")
@@ -127,7 +128,7 @@ class QtSafetyTests(unittest.TestCase):
         manager.shutdown(timeout=5)
 
     def test_save_does_not_silently_overwrite_a_day_updated_by_sync(self):
-        from PySide6.QtCore import QDate
+        from PySide6.QtCore import QDate, QEvent
 
         from ui.entry_view import EntryView
 
@@ -156,6 +157,7 @@ class QtSafetyTests(unittest.TestCase):
         self.assertIn("在你编辑期间已通过云同步更新", prompts[0])
         self.assertEqual(self.db.get_record(date)["note"], "手机上改的")  # 同步来的版本没有被覆盖
         view.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)  # 断开与全局 event_bus 的连接
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from core.app_paths import data_file_path
-from core.field_config import DEFAULT_FIELD_TREE, DEFAULT_PROFIT_FORMULA, flatten_formula_fields
+from core.field_config import DEFAULT_FIELD_TREE, DEFAULT_PROFIT_FORMULA, flatten_formula_fields, migrate_raw_data
 
 
 # 默认数据库文件路径：可执行文件同级目录，跨平台兼容
@@ -221,20 +221,24 @@ class DatabaseManager:
     # DailyRecords CRUD
     # ─────────────────────────────────────────────
 
-    def upsert_record(self, date: str, total_profit: float, raw_data: dict, note: str = "") -> None:
-        """新增或更新一条每日记录。"""
+    def upsert_record(self, date: str, total_profit: float, raw_data: dict, note: str = "",
+                      keep_note_if_empty: bool = True) -> None:
+        """
+        新增或更新一条每日记录。
+        keep_note_if_empty=True 时空备注不覆盖原备注（兼容旧调用）；录入页会先载入原备注，
+        因此录入页传 False：用户清空备注框即表示删除备注。
+        """
         raw_json = json.dumps(raw_data, ensure_ascii=False)
+        note_sql = "CASE WHEN trim(excluded.note) = '' THEN DailyRecords.note ELSE excluded.note END" \
+            if keep_note_if_empty else "excluded.note"
         with self._lock, self._conn:
-            self._conn.execute("""
+            self._conn.execute(f"""
                 INSERT INTO DailyRecords (date, total_profit, raw_data, note)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(date) DO UPDATE SET
                     total_profit = excluded.total_profit,
                     raw_data     = excluded.raw_data,
-                    note         = CASE
-                        WHEN trim(excluded.note) = '' THEN DailyRecords.note
-                        ELSE excluded.note
-                    END
+                    note         = {note_sql}
             """, (date, total_profit, raw_json, note))
             self._mark_record_dirty(date, deleted=False)
         self._notify_local_change()
@@ -428,6 +432,60 @@ class DatabaseManager:
                 self._mark_settings_dirty()
         if synced_changed:
             self._notify_local_change()
+
+    def save_settings(
+        self,
+        field_tree: list[dict],
+        formula: str,
+        parent_renames: dict[str, str] | None = None,
+        child_renames: dict[str, dict[str, str]] | None = None,
+    ) -> int:
+        """
+        在一个事务里保存分类与公式；有改名时同时改写历史记录里的键名（这些记录会同步到其他设备）。
+        返回被改写的记录数。
+        """
+        parent_renames = parent_renames or {}
+        child_renames = {k: v for k, v in (child_renames or {}).items() if v}
+        values = {
+            "custom_field_tree": json.dumps(field_tree, ensure_ascii=False),
+            "custom_fields": json.dumps(flatten_formula_fields(field_tree), ensure_ascii=False),
+            "profit_formula": formula,
+        }
+        migrated = 0
+        settings_changed = False
+        with self._lock, self._conn:
+            if parent_renames or child_renames:
+                for row in self._conn.execute("SELECT date, raw_data FROM DailyRecords").fetchall():
+                    raw = _json_dict(row["raw_data"])
+                    new_raw = migrate_raw_data(raw, parent_renames, child_renames)
+                    if new_raw != raw or list(new_raw) != list(raw):
+                        self._conn.execute(
+                            "UPDATE DailyRecords SET raw_data = ? WHERE date = ?",
+                            (json.dumps(new_raw, ensure_ascii=False), row["date"]),
+                        )
+                        self._mark_record_dirty(row["date"], deleted=False)
+                        migrated += 1
+            for key, value in values.items():
+                old = self._conn.execute("SELECT value FROM Config WHERE key = ?", (key,)).fetchone()
+                if old is None or old["value"] != value:
+                    settings_changed = True
+                self._conn.execute("""
+                    INSERT INTO Config (key, value) VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """, (key, value))
+            if settings_changed:
+                self._mark_settings_dirty()
+        if migrated or settings_changed:
+            self._notify_local_change()
+        return migrated
+
+    def settings_signature(self) -> str:
+        """当前分类与公式的指纹，用于判断编辑期间设置是否被云同步改过。"""
+        from core.field_config import load_field_tree_from_json
+        from core.formula_engine import format_formula
+
+        tree = load_field_tree_from_json(self.get_config("custom_field_tree", "") or self.get_config("custom_fields", ""))
+        return json.dumps([tree, format_formula(self.get_config("profit_formula", ""))], ensure_ascii=False)
 
     def get_all_config(self) -> dict[str, str]:
         """返回所有配置项字典。"""

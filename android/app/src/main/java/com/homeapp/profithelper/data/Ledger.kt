@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.homeapp.profithelper.core.FieldConfig
 import com.homeapp.profithelper.core.FieldNode
+import com.homeapp.profithelper.core.FormulaEngine
 import com.homeapp.profithelper.core.RawData
 import java.io.File
 import java.io.InputStream
@@ -134,12 +135,15 @@ class Ledger(private val context: Context, dbName: String = "ledger.db") {
         }
     }
 
-    /** 新增或更新一天的记录。备注留空时保留这一天原有的备注（与桌面端一致）。 */
-    fun upsertRecord(date: String, totalProfit: Double, rawData: RawData, note: String) {
+    /**
+     * 新增或更新一天的记录（与桌面端 upsert_record 一致）。
+     * keepNoteIfEmpty = true 时备注留空会保留原有备注；录入页传 false，用户清空备注就是要删掉它。
+     */
+    fun upsertRecord(date: String, totalProfit: Double, rawData: RawData, note: String, keepNoteIfEmpty: Boolean = true) {
         db.beginTransaction()
         try {
             val existingNote = getRecord(date)?.note ?: ""
-            val finalNote = if (note.isBlank()) existingNote else note
+            val finalNote = if (note.isBlank() && keepNoteIfEmpty) existingNote else note
             val modifiedAt = nextModifiedAt(date)
             val values = ContentValues().apply {
                 put("total_profit", totalProfit)
@@ -230,6 +234,64 @@ class Ledger(private val context: Context, dbName: String = "ledger.db") {
         }
         if (syncedChanged) localChanged() else bumpVersion()
     }
+
+    /**
+     * 在一个事务里保存分类与公式（与桌面端 save_settings 一致）；有改名时同时改写历史记录里的键名，
+     * 这些记录会同步到其他设备。返回被改写的记录数。
+     */
+    fun saveSettings(
+        tree: List<FieldNode>,
+        formula: String,
+        parentRenames: Map<String, String> = emptyMap(),
+        childRenames: Map<String, Map<String, String>> = emptyMap(),
+    ): Int {
+        val renamesChildren = childRenames.filterValues { it.isNotEmpty() }
+        val values = mapOf(
+            "custom_field_tree" to FieldConfig.treeToJson(tree),
+            "custom_fields" to FieldConfig.fieldsToJson(tree),
+            "profit_formula" to formula,
+        )
+        var migrated = 0
+        var settingsChanged = false
+        db.beginTransaction()
+        try {
+            if (parentRenames.isNotEmpty() || renamesChildren.isNotEmpty()) {
+                val rows = mutableListOf<Pair<String, String>>()
+                db.rawQuery("SELECT date, raw_data FROM records WHERE deleted = 0", null).use {
+                    while (it.moveToNext()) rows += it.getString(0) to (it.getString(1) ?: "{}")
+                }
+                for ((date, rawText) in rows) {
+                    val raw = FieldConfig.parseRawData(rawText)
+                    val updated = FieldConfig.migrateRawData(raw, parentRenames, renamesChildren)
+                    if (updated != raw || updated.keys.toList() != raw.keys.toList()) {
+                        db.update("records", ContentValues().apply {
+                            put("raw_data", FieldConfig.rawDataToJson(updated))
+                            put("modified_at", nextModifiedAt(date))
+                            put("dirty", 1)
+                        }, "date = ?", arrayOf(date))
+                        migrated++
+                    }
+                }
+            }
+            for ((key, value) in values) {
+                val old = db.rawQuery("SELECT value FROM config WHERE key = ?", arrayOf(key)).use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                }
+                if (old != value) settingsChanged = true
+                putConfig(db, key, value)
+            }
+            if (settingsChanged) markSettingsDirty()
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        if (migrated > 0 || settingsChanged) localChanged() else bumpVersion()
+        return migrated
+    }
+
+    /** 当前分类与公式的指纹（只整理了公式格式不算修改），用于判断编辑期间设置是否被云同步改过。 */
+    fun settingsSignature(): String =
+        FieldConfig.treeToJson(fieldTree()) + "\u0000" + FormulaEngine.format(getConfig("profit_formula"))
 
     private fun markSettingsDirty() {
         val previous = getMeta("settings_modified_at").toLongOrNull() ?: 0L

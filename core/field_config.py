@@ -145,6 +145,48 @@ def build_formula_variables(field_tree: list[dict[str, Any]], raw_data: dict[str
     return variables
 
 
+def migrate_raw_data(
+    raw_data: dict[str, Any],
+    parent_renames: dict[str, str],
+    child_renames: dict[str, dict[str, str]],
+) -> dict[str, Any]:
+    """
+    分类改名后改写一天数据里的键名（安卓端 FieldConfig.migrateRawData 规则相同）。
+    parent_renames：{旧一级名: 新一级名}；child_renames：{新一级名: {旧二级名: 新二级名}}。
+    """
+    migrated: dict[str, Any] = {}
+    for key, value in raw_data.items():
+        new_key = parent_renames.get(key, key)
+        if isinstance(value, dict):
+            mapping = child_renames.get(new_key, {})
+            value = {mapping.get(child, child): amount for child, amount in value.items()}
+            if isinstance(migrated.get(new_key), dict):
+                value = {**migrated[new_key], **value}
+        migrated[new_key] = value
+    return migrated
+
+
+def merge_entry_raw(previous: dict[str, Any], collected: dict[str, Any], field_tree: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    保存录入时合并：当前分类的金额以录入框为准，当前分类里已经没有的旧数据（例如删掉的分类）原样保留，
+    这样“删除分类不会删除已保存的历史数据”在重新保存某一天时依然成立。
+    """
+    merged: dict[str, Any] = {}
+    for item in field_tree:
+        name = item["name"]
+        value = collected.get(name, 0.0)
+        old = previous.get(name)
+        if item["children"] and isinstance(value, dict) and isinstance(old, dict):
+            extra = {child: amount for child, amount in old.items() if child not in item["children"]}
+            if extra:
+                value = {**value, **extra}
+        merged[name] = value
+    for key, value in previous.items():
+        if key not in merged:
+            merged[key] = value
+    return merged
+
+
 def summarize_raw_data(raw_data: dict[str, Any], limit: int = 3) -> str:
     """将嵌套账目数据压缩成适合历史列表展示的摘要。"""
     parts: list[str] = []

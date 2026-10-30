@@ -600,12 +600,6 @@ QListWidget::item:selected {
     color: #5B6175;
 }
 
-#ProfitPanel {
-    background-color: #EEECFD;
-    border: 1px solid #E2DFFB;
-    border-radius: 12px;
-}
-
 #ProfitCaption {
     font-size: 12px;
     color: #5B4FE0;
@@ -783,4 +777,15 @@ QPlainTextEdit#FormulaInput {
 QPlainTextEdit[invalid="true"] {
     border: 1px solid #D9363E;
     background-color: #FFF7F7;
+}
+
+/* ──── 页面底部固定操作栏（保存、导出等主要按钮） ──── */
+#ActionBar {
+    background-color: #FFFFFF;
+    border: none;
+    border-top: 1px solid #E4E7EF;
+}
+
+#ActionBar #ProfitCaption {
+    font-size: 12px;
 }

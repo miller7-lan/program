@@ -202,6 +202,7 @@ class FlowLayout(QLayout):
 
     def addItem(self, item):  # noqa: N802 - Qt API
         self._items.append(item)
+        self.invalidate()  # 新增的按钮立即参与排版，不必等窗口改变大小
 
     def addWidget(self, widget):  # noqa: N802 - Qt API
         self.addChildWidget(widget)
@@ -214,7 +215,11 @@ class FlowLayout(QLayout):
         return self._items[index] if 0 <= index < len(self._items) else None
 
     def takeAt(self, index):  # noqa: N802 - Qt API
-        return self._items.pop(index) if 0 <= index < len(self._items) else None
+        if not 0 <= index < len(self._items):
+            return None
+        item = self._items.pop(index)
+        self.invalidate()
+        return item
 
     def expandingDirections(self):  # noqa: N802 - Qt API
         return Qt.Orientation(0)
@@ -266,6 +271,7 @@ class FlowLayout(QLayout):
             if widget is not None:
                 widget.setParent(None)
                 widget.deleteLater()
+        self.invalidate()
 
 
 # ─────────────────────────────────────────────

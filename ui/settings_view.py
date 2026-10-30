@@ -2,25 +2,26 @@
 ui/settings_view.py
 设置页 — 分类结构、利润公式、云同步、数据备份。
 
-  - 分类结构：左侧一级分类、右侧所选一级分类的二级分类，支持添加 / 改名 / 删除 / 排序
-  - 利润公式：实时校验，点击运算符和分类卡片即可插入
-  - 云同步：粘贴连接码或手动填写服务器地址与同步密钥，测试连接、立即同步、复制连接码给手机
+  - 分类结构：左侧一级分类、右侧所选一级分类的二级分类，支持添加 / 改名 / 删除 / 排序；
+    改名会同步改写历史记录里的名称，删除分类不会删除已保存的数据
+  - 利润公式：实时校验；下方为每个分类提供插入按钮（新增的分类立即出现）；离开输入框和保存时自动整理格式
+  - 云同步：服务器已内置（读取程序旁的 ProfitHelper-sync.txt），这里只显示状态，不需要填写
   - 数据备份：导入 / 导出 family_ledger.db 兼容格式的完整账本
+  - 底部固定操作栏：还原 / 保存设置；有未保存的修改时切换页面或关闭程序会先询问
 """
 
 from __future__ import annotations
 
 import json
 import re
-import threading
+import unicodedata
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QGuiApplication
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
-    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLineEdit,
@@ -33,36 +34,17 @@ from PySide6.QtWidgets import (
 )
 
 from core.event_bus import event_bus
-from core.field_config import (
-    field_name_problem,
-    flatten_formula_fields,
-    load_field_tree_from_json,
-    normalize_field_tree,
-)
-from core.formula_engine import FormulaEngine, normalize_formula
-from core.sync_client import SyncConfig, SyncError, make_connection_code, normalize_server_url, parse_connection_code
+from core.field_config import field_name_problem, flatten_formula_fields, load_field_tree_from_json, normalize_field_tree
+from core.formula_engine import FormulaEngine, format_formula
 from core.version import APP_VERSION
-from ui import icons, theme
+from ui import theme
 from ui.widgets import Badge, Card, FlowLayout, IconLabel, label, make_button, page_header, page_scroll, set_tone
-
-
-class _BackgroundCall(QObject):
-    """在后台线程执行函数，并把结果送回界面线程。"""
-
-    done = Signal(object, object)
-
-    def run(self, func) -> None:
-        def worker():
-            try:
-                self.done.emit(func(), None)
-            except Exception as exc:  # 结果统一交给界面线程处理
-                self.done.emit(None, exc)
-
-        threading.Thread(target=worker, daemon=True).start()
 
 
 class FormulaEdit(QPlainTextEdit):
     """自动换行的单行公式编辑框：长公式也能完整显示，回车不会插入换行。"""
+
+    editing_finished = Signal()
 
     def __init__(self):
         super().__init__()
@@ -88,8 +70,13 @@ class FormulaEdit(QPlainTextEdit):
     def keyPressEvent(self, event):  # noqa: N802 - Qt API
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             event.accept()
+            self.editing_finished.emit()
             return
         super().keyPressEvent(event)
+
+    def focusOutEvent(self, event):  # noqa: N802 - Qt API
+        super().focusOutEvent(event)
+        self.editing_finished.emit()
 
     def insertFromMimeData(self, source):  # noqa: N802 - Qt API
         self.insertPlainText(source.text().replace("\r", " ").replace("\n", " "))
@@ -105,20 +92,20 @@ def section_header(title: str, hint: str = "") -> QVBoxLayout:
 
 
 class SettingsView(QWidget):
-    """设置视图：自定义分级字段、利润公式、云同步与备份。"""
+    """设置视图：自定义分级字段、利润公式、云同步状态与备份。"""
 
     def __init__(self, db, sync_manager, parent=None):
         super().__init__(parent)
         self._db = db
         self._sync = sync_manager
         self._engine = FormulaEngine()
+        # 编辑中的分类树；orig / child_orig 记录载入时的原名，用于保存时把改名同步到历史记录
         self._tree: list[dict] = []
         self._saved_signature = ""
-        self._test_call = _BackgroundCall(self)
-        self._test_call.done.connect(self._on_test_done)
         self._build_ui()
         self._load_config()
-        self._load_sync_fields()
+        self._refresh_sync_status()
+        QShortcut(QKeySequence.StandardKey.Save, self, activated=self._on_save)
         sync_manager.status_changed.connect(self._refresh_sync_status)
         event_bus.config_changed.connect(self._on_external_config_change)
 
@@ -129,28 +116,38 @@ class SettingsView(QWidget):
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
         content = QWidget()
-        outer.addWidget(page_scroll(content))
+        outer.addWidget(page_scroll(content), 1)
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(28, 24, 28, 32)
+        layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(16)
 
-        header, _, actions = page_header("设置", "分类和公式修改后需要点“保存设置”；开启云同步后会自动同步到其他设备")
-        self._settings_badge = Badge()
-        actions.addWidget(self._settings_badge)
-        self._revert_btn = make_button("还原", "ghost")
-        self._revert_btn.clicked.connect(self._load_config)
-        actions.addWidget(self._revert_btn)
-        save_btn = make_button("保存设置", "primary", "save")
-        save_btn.clicked.connect(self._on_save)
-        actions.addWidget(save_btn)
+        header, _, _ = page_header("设置", "分类和公式修改后点底部的“保存设置”（Ctrl+S），保存后会自动同步到手机")
         layout.addLayout(header)
-
         layout.addWidget(self._build_category_card())
         layout.addWidget(self._build_formula_card())
         layout.addWidget(self._build_sync_card())
         layout.addWidget(self._build_backup_card())
         layout.addStretch()
+
+        bar = Card(object_name="ActionBar")
+        bar_layout = QHBoxLayout(bar)
+        bar_layout.setContentsMargins(28, 10, 28, 10)
+        bar_layout.setSpacing(8)
+        self._settings_badge = Badge()
+        bar_layout.addWidget(self._settings_badge)
+        self._bar_hint = label("分类和公式都已保存", "Hint")
+        bar_layout.addWidget(self._bar_hint)
+        bar_layout.addStretch()
+        self._revert_btn = make_button("还原", "ghost")
+        self._revert_btn.clicked.connect(self._load_config)
+        bar_layout.addWidget(self._revert_btn)
+        self._save_btn = make_button("保存设置", "primary", "save")
+        self._save_btn.setMinimumWidth(116)
+        self._save_btn.clicked.connect(self._on_save)
+        bar_layout.addWidget(self._save_btn)
+        outer.addWidget(bar)
 
     def _list_buttons(self, on_add, on_rename, on_delete, on_up, on_down, add_text: str) -> QHBoxLayout:
         row = QHBoxLayout()
@@ -175,8 +172,8 @@ class SettingsView(QWidget):
         layout.setSpacing(14)
         layout.addLayout(section_header(
             "分类结构",
-            "一级分类会自动汇总其下二级分类的金额；一级和二级分类名都可以直接写进利润公式。"
-            "改名不会改动已保存的历史数据。",
+            "一级分类会自动汇总其下二级分类的金额；分类名都可以直接写进利润公式。"
+            "改名会同步改写历史记录里的名称；删除分类不会删除已保存的数据。",
         ))
 
         columns = QHBoxLayout()
@@ -213,11 +210,12 @@ class SettingsView(QWidget):
         layout.setSpacing(12)
         layout.addLayout(section_header(
             "利润公式",
-            "支持 + − × ÷ 和括号，例如：营业额 - 成本 + 零钱，或 (现金 + 账户) * 0.9",
+            "支持 + − × ÷ 和括号，例如：营业额 - 成本 + 零钱，或 (现金 + 账户) * 0.9；离开输入框时会自动整理格式",
         ))
 
         self._formula_input = FormulaEdit()
         self._formula_input.textChanged.connect(self._on_formula_changed)
+        self._formula_input.editing_finished.connect(self._tidy_formula)
         layout.addWidget(self._formula_input)
 
         status_row = QHBoxLayout()
@@ -232,10 +230,10 @@ class SettingsView(QWidget):
         ops.setSpacing(6)
         for text, insert in [("+", " + "), ("−", " - "), ("×", " * "), ("÷", " / "), ("(", "("), (")", ")")]:
             button = make_button(text, "op")
-            button.clicked.connect(lambda _=False, value=insert: self._insert_formula_text(value))
+            button.clicked.connect(lambda _=False, value=insert: self._formula_input.insert(value))
             ops.addWidget(button)
         backspace = make_button("退格", "ghost")
-        backspace.clicked.connect(self._on_backspace)
+        backspace.clicked.connect(self._formula_input.backspace)
         ops.addWidget(backspace)
         clear = make_button("清空", "ghost")
         clear.clicked.connect(self._formula_input.clear)
@@ -243,7 +241,7 @@ class SettingsView(QWidget):
         ops.addStretch()
         layout.addLayout(ops)
 
-        layout.addWidget(label("点击插入分类（深色为一级分类的合计）", "Hint"))
+        layout.addWidget(label("点击插入分类（每个分类都有按钮，深色为一级分类的合计；新增分类后立即出现）", "Hint"))
         self._token_holder = QWidget()
         self._token_layout = FlowLayout(self._token_holder, 6, 8)
         layout.addWidget(self._token_holder)
@@ -253,15 +251,12 @@ class SettingsView(QWidget):
         card = Card()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 18, 20, 18)
-        layout.setSpacing(14)
-
-        head = QHBoxLayout()
-        head.addLayout(section_header(
+        layout.setSpacing(12)
+        layout.addLayout(section_header(
             "云同步",
-            "已内置同步服务器，Win10 电脑与安卓手机自动共用同一份账本。同一天在两台设备上都改过时，"
-            "以最后修改的为准，被覆盖的版本会保留在服务器上。",
-        ), 1)
-        layout.addLayout(head)
+            "同步服务器已内置，不需要填写。电脑与手机自动共用同一份账本；同一天两边都改过时以最后修改的为准，"
+            "被覆盖的版本会保留在服务器上。",
+        ))
 
         status = Card(object_name="SyncPanel")
         status_row = QHBoxLayout(status)
@@ -279,99 +274,17 @@ class SettingsView(QWidget):
         self._sync_now_btn = make_button("立即同步", "soft", "sync")
         self._sync_now_btn.clicked.connect(self._sync.sync_now)
         status_row.addWidget(self._sync_now_btn)
+        self._redetect_btn = make_button("重新检测", "soft", "sync")
+        self._redetect_btn.setToolTip("把 ProfitHelper-sync.txt 放到程序所在文件夹后点这里")
+        self._redetect_btn.clicked.connect(self._redetect_preset)
+        status_row.addWidget(self._redetect_btn)
         layout.addWidget(status)
 
-        self._auto_check = QCheckBox("自动同步（启动时、保存后、每 5 分钟）")
+        self._auto_check = QCheckBox("自动同步（启动时、保存后、每分钟）")
+        self._auto_check.setChecked(self._sync.auto_enabled)
         self._auto_check.toggled.connect(self._sync.set_auto_enabled)
         layout.addWidget(self._auto_check)
-
-        self._manual_toggle = make_button("更换服务器（一般不需要）", "ghost", "chevron-right")
-        self._manual_toggle.setCheckable(True)
-        self._manual_toggle.toggled.connect(self._toggle_manual_fields)
-        layout.addWidget(self._manual_toggle, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        self._manual_fields = QWidget()
-        manual = QVBoxLayout(self._manual_fields)
-        manual.setContentsMargins(0, 0, 0, 0)
-        manual.setSpacing(10)
-
-        code_row = QHBoxLayout()
-        code_row.setSpacing(8)
-        self._code_input = QLineEdit()
-        self._code_input.setPlaceholderText("粘贴 PH1- 开头的连接码")
-        self._code_input.returnPressed.connect(self._apply_connection_code)
-        code_row.addWidget(self._code_input, 1)
-        apply_code = make_button("识别连接码", "", "link")
-        apply_code.clicked.connect(self._apply_connection_code)
-        code_row.addWidget(apply_code)
-        manual.addLayout(code_row)
-
-        form = QFormLayout()
-        form.setContentsMargins(0, 0, 0, 0)
-        form.setHorizontalSpacing(14)
-        form.setVerticalSpacing(10)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._server_input = QLineEdit()
-        self._server_input.setPlaceholderText("https://example.com:28443")
-        form.addRow("服务器地址", self._server_input)
-
-        token_row = QHBoxLayout()
-        token_row.setSpacing(6)
-        self._token_input = QLineEdit()
-        self._token_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._token_input.setPlaceholderText("PH-XXXX-XXXX-…")
-        token_row.addWidget(self._token_input, 1)
-        self._reveal_btn = make_button("", "icon", "eye", tooltip="显示 / 隐藏密钥")
-        self._reveal_btn.setCheckable(True)
-        self._reveal_btn.toggled.connect(self._toggle_token_visible)
-        token_row.addWidget(self._reveal_btn)
-        token_holder = QWidget()
-        token_holder.setLayout(token_row)
-        token_row.setContentsMargins(0, 0, 0, 0)
-        form.addRow("同步密钥", token_holder)
-
-        self._ip_input = QLineEdit()
-        self._ip_input.setPlaceholderText("可选：域名解析失败时直接连接此 IP")
-        form.addRow("备用 IP", self._ip_input)
-        self._device_input = QLineEdit()
-        self._device_input.setPlaceholderText("在服务器上显示的设备名称")
-        form.addRow("本机名称", self._device_input)
-        manual.addLayout(form)
-
-        buttons = QHBoxLayout()
-        buttons.setSpacing(8)
-        save_sync = make_button("保存并同步", "primary", "cloud-check")
-        save_sync.clicked.connect(self._save_and_sync)
-        buttons.addWidget(save_sync)
-        self._test_btn = make_button("测试连接", "", "link")
-        self._test_btn.clicked.connect(self._test_connection)
-        buttons.addWidget(self._test_btn)
-        copy_code = make_button("复制连接码", "", "copy")
-        copy_code.clicked.connect(self._copy_connection_code)
-        buttons.addWidget(copy_code)
-        buttons.addStretch()
-        disconnect = make_button("断开", "danger")
-        disconnect.clicked.connect(self._disconnect_sync)
-        buttons.addWidget(disconnect)
-        manual.addLayout(buttons)
-
-        self._manual_fields.setVisible(False)
-        layout.addWidget(self._manual_fields)
-
-        self._test_result = label("", "Hint", wrap=True)
-        self._test_result.setVisible(False)
-        layout.addWidget(self._test_result)
         return card
-
-    def _show_result(self, text: str, tone: str = "Hint") -> None:
-        self._test_result.setObjectName(tone)
-        theme.repolish(self._test_result)
-        self._test_result.setText(text)
-        self._test_result.setVisible(bool(text))
-
-    def _toggle_manual_fields(self, visible: bool) -> None:
-        self._manual_fields.setVisible(visible)
-        icons.set_button_icon(self._manual_toggle, "chevron-down" if visible else "chevron-right", theme.TEXT_2, 16)
 
     def _build_backup_card(self) -> Card:
         card = Card()
@@ -380,7 +293,7 @@ class SettingsView(QWidget):
         layout.setSpacing(12)
         layout.addLayout(section_header(
             "数据备份",
-            "导出会生成 family_ledger.db 格式的完整账本（不含同步密钥），可在 Win10 和安卓端互相导入；"
+            "导出会生成 family_ledger.db 格式的完整账本（不含同步密钥），可在电脑和手机之间互相导入；"
             "导入会替换当前所有历史记录和设置。",
         ))
         row = QHBoxLayout()
@@ -407,8 +320,11 @@ class SettingsView(QWidget):
     # 分类结构
     # ─────────────────────────────────────
 
+    def _plain_tree(self) -> list[dict]:
+        return normalize_field_tree([{"name": n["name"], "children": list(n["children"])} for n in self._tree])
+
     def _all_names(self) -> set[str]:
-        return set(flatten_formula_fields(normalize_field_tree(self._tree)))
+        return set(flatten_formula_fields(self._plain_tree()))
 
     def _selected_parent_index(self) -> int:
         return self._parent_list.currentRow()
@@ -420,13 +336,13 @@ class SettingsView(QWidget):
             text, ok = QInputDialog.getText(self, title, prompt, QLineEdit.EchoMode.Normal, text)
             if not ok:
                 return None
-            name = text.strip()
+            name = unicodedata.normalize("NFKC", text).strip()  # 全角字母、数字转半角，和公式里的写法一致
             if name == exclude and exclude:
                 return None
             problem = field_name_problem(name, existing)
             if not problem:
                 return name
-            QMessageBox.warning(self, "名称不可用", problem)
+            QMessageBox.warning(self, "名称格式错误", problem)
 
     def _refresh_lists(self, parent_index: int | None = None, child_index: int | None = None) -> None:
         if parent_index is None:
@@ -435,8 +351,9 @@ class SettingsView(QWidget):
         self._parent_list.clear()
         for item in self._tree:
             count = len(item["children"])
-            entry = QListWidgetItem(f"{item['name']}    {count} 项" if count else f"{item['name']}    直接录入")
-            self._parent_list.addItem(entry)
+            self._parent_list.addItem(QListWidgetItem(
+                f"{item['name']}    {count} 项" if count else f"{item['name']}    直接录入"
+            ))
         self._parent_list.blockSignals(False)
         if self._tree:
             self._parent_list.setCurrentRow(min(parent_index, len(self._tree) - 1))
@@ -459,7 +376,7 @@ class SettingsView(QWidget):
     def _add_parent(self) -> None:
         name = self._ask_name("添加一级分类", "一级分类名称（例如：成本）：")
         if name:
-            self._tree.append({"name": name, "children": []})
+            self._tree.append({"name": name, "children": [], "orig": None, "child_orig": []})
             self._refresh_lists(len(self._tree) - 1)
 
     def _rename_parent(self) -> None:
@@ -467,7 +384,7 @@ class SettingsView(QWidget):
         if not (0 <= index < len(self._tree)):
             return
         old = self._tree[index]["name"]
-        name = self._ask_name("修改一级分类", "新的名称：", old, exclude=old)
+        name = self._ask_name("修改一级分类", "新的名称（历史记录和公式里的这一项会一起改名）：", old, exclude=old)
         if name:
             self._tree[index]["name"] = name
             self._rename_in_formula(old, name)
@@ -501,37 +418,51 @@ class SettingsView(QWidget):
         name = self._ask_name("添加二级分类", f"添加到「{parent['name']}」下的二级分类名称：")
         if name:
             parent["children"].append(name)
+            parent["child_orig"].append(None)
             self._refresh_lists(index, len(parent["children"]) - 1)
 
-    def _rename_child(self) -> None:
+    def _selected_child(self) -> tuple[int, int] | None:
         index = self._selected_parent_index()
         child_index = self._child_list.currentRow()
-        if not (0 <= index < len(self._tree)) or not (0 <= child_index < len(self._tree[index]["children"])):
+        if 0 <= index < len(self._tree) and 0 <= child_index < len(self._tree[index]["children"]):
+            return index, child_index
+        return None
+
+    def _rename_child(self) -> None:
+        selected = self._selected_child()
+        if selected is None:
             return
+        index, child_index = selected
         old = self._tree[index]["children"][child_index]
-        name = self._ask_name("修改二级分类", "新的名称：", old, exclude=old)
+        name = self._ask_name("修改二级分类", "新的名称（历史记录和公式里的这一项会一起改名）：", old, exclude=old)
         if name:
             self._tree[index]["children"][child_index] = name
             self._rename_in_formula(old, name)
             self._refresh_lists(index, child_index)
 
     def _delete_child(self) -> None:
-        index = self._selected_parent_index()
-        child_index = self._child_list.currentRow()
-        if not (0 <= index < len(self._tree)) or not (0 <= child_index < len(self._tree[index]["children"])):
+        selected = self._selected_child()
+        if selected is None:
+            return
+        index, child_index = selected
+        name = self._tree[index]["children"][child_index]
+        if QMessageBox.question(self, "删除二级分类", f"确定删除「{name}」吗？\n已保存的历史数据不会被删除。") \
+                != QMessageBox.StandardButton.Yes:
             return
         self._tree[index]["children"].pop(child_index)
+        self._tree[index]["child_orig"].pop(child_index)
         self._refresh_lists(index, max(0, child_index - 1))
 
     def _move_child(self, step: int) -> None:
-        index = self._selected_parent_index()
-        child_index = self._child_list.currentRow()
-        if not (0 <= index < len(self._tree)):
+        selected = self._selected_child()
+        if selected is None:
             return
-        children = self._tree[index]["children"]
+        index, child_index = selected
         target = child_index + step
-        if 0 <= child_index < len(children) and 0 <= target < len(children):
-            children[child_index], children[target] = children[target], children[child_index]
+        node = self._tree[index]
+        if 0 <= target < len(node["children"]):
+            for key in ("children", "child_orig"):
+                node[key][child_index], node[key][target] = node[key][target], node[key][child_index]
             self._refresh_lists(index, target)
 
     def _rename_in_formula(self, old: str, new: str) -> None:
@@ -540,6 +471,15 @@ class SettingsView(QWidget):
         if updated != formula:
             self._formula_input.setText(updated)
             event_bus.toast_requested.emit(f"公式中的「{old}」已同步改为「{new}」", "info")
+
+    def _renames(self) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+        parent_renames = {n["orig"]: n["name"] for n in self._tree if n["orig"] and n["orig"] != n["name"]}
+        child_renames: dict[str, dict[str, str]] = {}
+        for node in self._tree:
+            mapping = {old: new for old, new in zip(node["child_orig"], node["children"]) if old and old != new}
+            if mapping:
+                child_renames[node["name"]] = mapping
+        return parent_renames, child_renames
 
     # ─────────────────────────────────────
     # 公式
@@ -550,30 +490,25 @@ class SettingsView(QWidget):
         for item in self._tree:
             parent_btn = make_button(item["name"] + (" 合计" if item["children"] else ""),
                                      "token-total" if item["children"] else "token")
-            parent_btn.clicked.connect(lambda _=False, n=item["name"]: self._insert_formula_text(n))
+            parent_btn.clicked.connect(lambda _=False, n=item["name"]: self._formula_input.insert(n))
             self._token_layout.addWidget(parent_btn)
             for child in item["children"]:
                 child_btn = make_button(child, "token")
-                child_btn.clicked.connect(lambda _=False, n=child: self._insert_formula_text(n))
+                child_btn.clicked.connect(lambda _=False, n=child: self._formula_input.insert(n))
                 self._token_layout.addWidget(child_btn)
         self._token_holder.updateGeometry()
 
-    def _insert_formula_text(self, text: str) -> None:
-        self._formula_input.insert(text)
-
-    def _on_backspace(self) -> None:
-        self._formula_input.backspace()
-
-    def _formula_problem(self) -> tuple[str, str]:
+    def _formula_problem(self, formula: str | None = None, tree: list[dict] | None = None) -> tuple[str, str]:
         """返回 (语气, 说明)，语气为 ok / warn / error。"""
-        formula = self._formula_input.text().strip()
+        formula = (self._formula_input.text() if formula is None else formula).strip()
+        names = {unicodedata.normalize("NFKC", n) for n in flatten_formula_fields(self._plain_tree() if tree is None else tree)}
         if not formula:
             return "error", "公式不能为空"
         ok, message = self._engine.validate(formula)
         if not ok:
             return "error", message
         used = list(dict.fromkeys(self._engine.extract_variables(formula)))
-        undefined = [name for name in used if name not in self._all_names()]
+        undefined = [name for name in used if name not in names]
         if undefined:
             return "warn", f"引用了不存在的分类：{'、'.join(undefined)}，请先添加分类或修改公式"
         return "ok", f"公式有效，引用了 {len(used)} 个分类"
@@ -590,182 +525,131 @@ class SettingsView(QWidget):
         theme.repolish(self._formula_input)
         self._update_dirty_badge()
 
+    def _tidy_formula(self) -> None:
+        """离开公式框时自动整理格式（全角符号、空格），公式有误时保持原样等待修改。"""
+        text = self._formula_input.text()
+        tidy = format_formula(text)
+        if tidy != text and self._engine.validate(tidy)[0]:
+            self._formula_input.setText(tidy)
+
     # ─────────────────────────────────────
     # 读取 / 保存
     # ─────────────────────────────────────
 
     def _signature(self) -> str:
-        return json.dumps([normalize_field_tree(self._tree), self._formula_input.text().strip()], ensure_ascii=False)
+        # 与 DatabaseManager.settings_signature 相同的写法：只整理了公式格式不算修改
+        return json.dumps([self._plain_tree(), format_formula(self._formula_input.text())], ensure_ascii=False)
+
+    def is_dirty(self) -> bool:
+        return self._signature() != self._saved_signature
 
     def _update_dirty_badge(self) -> None:
-        dirty = self._signature() != self._saved_signature
+        dirty = self.is_dirty()
         self._settings_badge.set("有未保存的修改" if dirty else "", "warning")
-        self._revert_btn.setVisible(dirty)
+        self._bar_hint.setVisible(not dirty)
+        self._revert_btn.setEnabled(dirty)
 
     def _load_config(self) -> None:
-        field_tree_json = self._db.get_config("custom_field_tree", "")
-        if not field_tree_json:
-            field_tree_json = self._db.get_config("custom_fields", '["营业额", "成本"]')
-        self._tree = load_field_tree_from_json(field_tree_json)
+        field_tree_json = self._db.get_config("custom_field_tree", "") or self._db.get_config("custom_fields", "")
+        self._tree = [
+            {"name": n["name"], "children": list(n["children"]), "orig": n["name"], "child_orig": list(n["children"])}
+            for n in load_field_tree_from_json(field_tree_json)
+        ]
         self._formula_input.blockSignals(True)
-        self._formula_input.setText(self._db.get_config("profit_formula", "营业额 - 成本"))
+        self._formula_input.setText(format_formula(self._db.get_config("profit_formula", "")))
         self._formula_input.blockSignals(False)
-        self._saved_signature = self._signature()
+        self._saved_signature = self._db.settings_signature()
         self._refresh_lists(0)
 
     def _on_external_config_change(self) -> None:
-        if self._signature() == self._saved_signature:
+        if not self.is_dirty():
             self._load_config()
 
-    def _on_save(self) -> None:
-        field_tree = normalize_field_tree(self._tree)
-        fields = flatten_formula_fields(field_tree)
-        formula = " ".join(normalize_formula(self._formula_input.text()).split())
-
-        if not fields:
-            QMessageBox.warning(self, "配置错误", "请至少添加一个一级分类。")
-            return
-        tone, message = self._formula_problem()
+    def _on_save(self) -> bool:
+        tree = self._plain_tree()
+        if not tree:
+            QMessageBox.warning(self, "分类不能为空", "请至少添加一个一级分类。")
+            return False
+        formula = format_formula(self._formula_input.text())
+        tone, message = self._formula_problem(formula, tree)
         if tone != "ok":
-            QMessageBox.warning(self, "公式需要修改", message)
-            return
+            QMessageBox.warning(self, "公式格式错误", f"{message}\n\n请修改后再保存。")
+            self._formula_input.setFocus()
+            return False
+        if self._db.settings_signature() != self._saved_signature and not self._confirm_overwrite_remote():
+            return False
 
-        self._db.set_configs({
-            "custom_field_tree": json.dumps(field_tree, ensure_ascii=False),
-            "custom_fields": json.dumps(fields, ensure_ascii=False),
-            "profit_formula": formula,
-        })
-        self._tree = field_tree
-        self._formula_input.blockSignals(True)
-        self._formula_input.setText(formula)
-        self._formula_input.blockSignals(False)
-        self._saved_signature = self._signature()
-        self._update_dirty_badge()
+        parent_renames, child_renames = self._renames()
+        migrated = self._db.save_settings(tree, formula, parent_renames, child_renames)
+        self._load_config()
         event_bus.config_changed.emit()
-        event_bus.toast_requested.emit("设置已保存，录入页和导出报表会按新分类展示", "success")
+        if migrated:
+            event_bus.data_changed.emit()
+        extra = f"，{migrated} 天的历史记录已同步改名" if migrated else ""
+        event_bus.toast_requested.emit(f"设置已保存{extra}，会自动同步到手机", "success")
+        return True
+
+    def _confirm_overwrite_remote(self) -> bool:
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("设置刚被其他设备修改过")
+        box.setText("在你编辑期间，分类或公式已通过云同步更新。\n继续保存会用你现在的设置覆盖它（被覆盖的版本仍保留在服务器上）。")
+        overwrite = box.addButton("仍然保存", QMessageBox.ButtonRole.AcceptRole)
+        reload_latest = box.addButton("载入最新设置", QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(reload_latest)
+        box.exec()
+        if box.clickedButton() is reload_latest:
+            self._load_config()
+        return box.clickedButton() is overwrite
+
+    def confirm_leave(self) -> bool:
+        """有未保存的设置时询问。返回 True 表示可以离开设置页。"""
+        if not self.is_dirty():
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("设置尚未保存")
+        box.setText("分类或公式的修改还没有保存。")
+        save = box.addButton("保存", QMessageBox.ButtonRole.AcceptRole)
+        discard = box.addButton("不保存", QMessageBox.ButtonRole.DestructiveRole)
+        box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(save)
+        box.exec()
+        if box.clickedButton() is save:
+            return self._on_save()
+        if box.clickedButton() is discard:
+            self._load_config()
+            return True
+        return False
 
     # ─────────────────────────────────────
-    # 云同步
+    # 云同步状态
     # ─────────────────────────────────────
-
-    def _load_sync_fields(self) -> None:
-        config = self._sync.engine.load_config()
-        self._server_input.setText(config.server_url)
-        self._token_input.setText(config.token)
-        self._ip_input.setText(config.fallback_ip)
-        self._device_input.setText(self._sync.engine.device_name())
-        self._auto_check.blockSignals(True)
-        self._auto_check.setChecked(self._sync.auto_enabled)
-        self._auto_check.blockSignals(False)
-        # 没有内置配置、也没有连接过时才自动展开，方便手动填写
-        self._manual_toggle.setChecked(not self._sync.configured)
-        self._refresh_sync_status()
 
     def _refresh_sync_status(self) -> None:
         title, detail, tone = self._sync.status_view()
-        if tone == "off":
-            detail = "粘贴连接码后点“保存并同步”即可开启"
         self._sync_title.setText(title)
         set_tone(self._sync_title, tone)
         self._sync_detail.setText(detail)
         icon_name, color = {"ok": ("cloud-check", theme.SUCCESS), "error": ("alert", theme.DANGER),
                             "busy": ("sync", theme.ACCENT)}.get(tone, ("cloud-off", theme.TEXT_3))
         self._sync_icon.set_icon(icon_name, color)
-        self._sync_now_btn.setEnabled(self._sync.configured and tone != "busy")
+        configured = self._sync.configured
+        self._sync_now_btn.setVisible(configured)
+        self._sync_now_btn.setEnabled(tone != "busy")
+        self._redetect_btn.setVisible(self._sync.needs_preset)  # 缺少配置文件或密钥已失效
+        self._auto_check.setEnabled(configured)
 
-    def _toggle_token_visible(self, visible: bool) -> None:
-        self._token_input.setEchoMode(QLineEdit.EchoMode.Normal if visible else QLineEdit.EchoMode.Password)
-        icons.set_button_icon(self._reveal_btn, "eye-off" if visible else "eye", theme.TEXT_2, 16)
-
-    def _apply_connection_code(self) -> None:
-        try:
-            config = parse_connection_code(self._code_input.text())
-        except SyncError as exc:
-            QMessageBox.warning(self, "无法识别", str(exc))
-            return
-        self._server_input.setText(config.server_url)
-        self._token_input.setText(config.token)
-        self._ip_input.setText(config.fallback_ip)
-        self._code_input.clear()
-        self._show_result(f"已识别：{config.server_url}。点击“保存并同步”即可开始。", "OkText")
-
-    def _form_config(self) -> SyncConfig | None:
-        try:
-            url = normalize_server_url(self._server_input.text())
-        except SyncError as exc:
-            QMessageBox.warning(self, "服务器地址", str(exc))
-            return None
-        token = self._token_input.text().strip()
-        if not url or not token:
-            QMessageBox.warning(self, "信息不完整", "请先粘贴连接码并点“识别连接码”，或在“更换服务器”中填写服务器地址和同步密钥。")
-            return None
-        return SyncConfig(server_url=url, token=token, fallback_ip=self._ip_input.text().strip())
-
-    def _test_connection(self) -> None:
-        config = self._form_config()
-        if config is None:
-            return
-        self._test_btn.setEnabled(False)
-        self._show_result("正在连接服务器…")
-        self._test_call.run(lambda: self._sync.engine.test_connection(config))
-
-    def _on_test_done(self, status, error) -> None:
-        self._test_btn.setEnabled(True)
-        if error is not None:
-            self._show_result(f"连接失败：{error}", "ErrorText")
+    def _redetect_preset(self) -> None:
+        if self._sync.reload_preset():
+            event_bus.toast_requested.emit("已读取内置同步配置，正在同步…", "success")
         else:
-            devices = "、".join(d["name"] for d in status.get("devices", [])[:4] if d.get("name")) or "暂无"
-            self._show_result(
-                f"连接成功：服务器上有 {status.get('record_count', 0)} 天记录，最近同步过的设备：{devices}", "OkText"
-            )
-
-    def _save_and_sync(self) -> None:
-        config = self._form_config()
-        if config is None:
-            return
-        first_time = not self._db.get_sync_meta("last_sync_at")
-        local_count = len(self._db.get_all_records())
-        if first_time and local_count:
-            reply = QMessageBox.question(
+            QMessageBox.information(
                 self,
-                "首次同步",
-                f"本机有 {local_count} 天记录，将与服务器上的账本合并：\n"
-                "· 服务器上没有的日期会上传；\n"
-                "· 同一天两边都有数据时，以最后修改的为准；\n"
-                "· 同步前会自动在数据文件旁备份一份（family_ledger.before-sync-*.db）。\n\n确定开始同步吗？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                "没有找到同步配置",
+                f"请把 ProfitHelper-sync.txt 放到程序所在的文件夹：\n{self._db.data_directory()}\n\n然后再点“重新检测”。",
             )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-        self._sync.save_config(config, self._device_input.text())
-        self._sync.sync_now()
-        self._show_result("已保存，正在同步…")
-
-    def _copy_connection_code(self) -> None:
-        config = self._form_config()
-        if config is None:
-            return
-        QGuiApplication.clipboard().setText(make_connection_code(config.server_url, config.token, config.fallback_ip))
-        QMessageBox.information(
-            self,
-            "连接码已复制",
-            "连接码已复制到剪贴板。\n\n安卓端已内置服务器，一般不需要；如需手动连接其他设备，"
-            "可在安卓端“设置 → 云同步 → 更换服务器”中粘贴。\n连接码包含同步密钥，请不要发给其他人。",
-        )
-
-    def _disconnect_sync(self) -> None:
-        if not self._sync.configured:
-            return
-        reply = QMessageBox.question(
-            self,
-            "断开云同步",
-            "断开后本机不再与服务器同步，本机数据会保留。\n以后重新连接时会再次合并数据。确定断开吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            self._sync.disconnect()
-            self._load_sync_fields()
-            self._show_result("")
 
     # ─────────────────────────────────────
     # 导入 / 导出
@@ -799,7 +683,7 @@ class SettingsView(QWidget):
         if not import_path:
             return
 
-        sync_note = "\n开启了云同步，导入结果也会同步到其他设备。" if self._sync.configured else ""
+        sync_note = "\n开启了云同步，导入结果也会同步到手机。" if self._sync.configured else ""
         reply = QMessageBox.question(
             self,
             "确认导入",
@@ -812,7 +696,7 @@ class SettingsView(QWidget):
         try:
             result = self._db.import_database(import_path)
         except Exception as exc:
-            QMessageBox.critical(self, "导入失败", f"导入文件不符合账本格式，或读取失败：\n{exc}")
+            QMessageBox.critical(self, "导入文件格式错误", f"导入文件不符合账本格式，或读取失败：\n{exc}")
             return
 
         self._load_config()
@@ -825,7 +709,7 @@ class SettingsView(QWidget):
         )
 
     def showEvent(self, event) -> None:  # noqa: N802 - Qt API
-        if self._signature() == self._saved_signature:
+        if not self.is_dirty():
             self._load_config()
         self._refresh_sync_status()
         super().showEvent(event)
