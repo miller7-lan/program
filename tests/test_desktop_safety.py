@@ -83,6 +83,78 @@ class PresetRotationTests(unittest.TestCase):
         self.assertEqual(self.db.get_sync_meta("config_source"), "preset")
 
 
+class EmbeddedPresetTests(unittest.TestCase):
+    """exe 内置连接码（点开即用）与在压缩包里直接打开时的数据位置。"""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="embed-"))
+        self.exe = self.tmp / "app" / "ProfitHelper.exe"
+        self.exe.parent.mkdir()
+        self.exe.write_bytes(b"MZ" + bytes(range(256)) * 64)  # 假的 exe 内容
+        self.saved = (getattr(sys, "frozen", None), sys.executable, preset.data_file_path,
+                      os.environ.get("LOCALAPPDATA"))
+
+    def tearDown(self):
+        frozen, sys.executable, preset.data_file_path, local = self.saved
+        if frozen is None:
+            sys.__dict__.pop("frozen", None)
+        else:
+            sys.frozen = frozen
+        if local is None:
+            os.environ.pop("LOCALAPPDATA", None)
+        else:
+            os.environ["LOCALAPPDATA"] = local
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _pretend_frozen(self, exe: Path) -> None:
+        sys.frozen = True
+        sys.executable = str(exe)
+
+    def test_embedded_code_is_found_and_can_be_replaced(self):
+        from tools.embed_preset import embed
+
+        first = make_connection_code("https://example.com:28443", "PH-FIRST")
+        second = make_connection_code("https://example.com:28443", "PH-SECOND")
+        embed(self.exe, first, self.exe)
+        self.assertEqual(preset.read_embedded_code(self.exe), first)
+        embed(self.exe, second, self.exe)  # 换密钥：去掉旧的再写新的
+        self.assertEqual(preset.read_embedded_code(self.exe), second)
+        self.assertNotIn(first.encode(), self.exe.read_bytes())
+        self.assertTrue(self.exe.read_bytes().startswith(b"MZ" + bytes(range(256))))  # 原来的内容不变
+        with self.assertRaises(Exception):
+            embed(self.exe, "PH1-broken", self.tmp / "bad.exe")
+        self.assertFalse((self.tmp / "bad.exe").exists())
+
+    def test_file_next_to_exe_wins_and_embedded_code_is_the_fallback(self):
+        from tools.embed_preset import embed
+
+        embedded = make_connection_code("https://example.com:28443", "PH-EMBEDDED")
+        embed(self.exe, embedded, self.exe)
+        self._pretend_frozen(self.exe)
+        preset.data_file_path = lambda name: self.exe.parent / name
+        self.assertEqual(preset.find_preset(), (embedded, "embedded"))  # 只有 exe：点开即用
+        from_file = make_connection_code("https://example.com:28443", "PH-FROM-FILE")
+        (self.exe.parent / "ProfitHelper-sync.txt").write_text(from_file, encoding="utf-8")
+        self.assertEqual(preset.find_preset(), (from_file, "file"))  # 换密钥时替换旁边的文件即可
+        (self.exe.parent / "ProfitHelper-sync.txt").write_text("PH1-截断了", encoding="utf-8")
+        self.assertEqual(preset.find_preset(), (embedded, "embedded"))  # 文件损坏时退回内置的
+
+    def test_running_from_a_temp_folder_keeps_data_in_local_appdata(self):
+        from core import app_paths
+
+        os.environ["LOCALAPPDATA"] = str(self.tmp / "local")
+        in_temp = Path(tempfile.gettempdir()) / f"Rar$EX{os.getpid()}" / "ProfitHelper.exe"
+        self._pretend_frozen(in_temp)
+        self.assertTrue(app_paths.running_from_temp())
+        self.assertEqual(app_paths.data_dir(), self.tmp / "local" / "ProfitHelper")
+        self.assertTrue((self.tmp / "local" / "ProfitHelper").is_dir())
+
+        outside = Path.home() / "利润助手-测试不存在" / "ProfitHelper.exe"
+        self._pretend_frozen(outside)
+        self.assertFalse(app_paths.running_from_temp())
+        self.assertEqual(app_paths.data_dir(), outside.parent.resolve())
+
+
 @unittest.skipIf(QApplication is None, "需要 PySide6")
 class QtSafetyTests(unittest.TestCase):
     @classmethod

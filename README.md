@@ -49,10 +49,12 @@ python -m unittest discover -s tests
 同步服务器内置在两端程序里，使用人不需要填写任何服务器信息：
 
 1. 在服务器上部署同步服务（见 [server/deploy/README.md](server/deploy/README.md)），得到 `PH1-` 开头的连接码。
-2. 桌面端：把连接码保存为 `ProfitHelper-sync.txt`，和 exe 放在同一个文件夹里分发（不要提交到仓库）。
-   程序启动时自动连接；文件缺失时设置页会提示，放好后点“重新检测”即可。
+2. 桌面端：把连接码保存为 `ProfitHelper-sync.txt`（不要提交到仓库），再在本机把它写进 Actions 打包好的 exe：
+   `python tools/embed_preset.py ProfitHelper.exe ProfitHelper-sync.txt 输出/ProfitHelper.exe`。
+   得到的 exe 单独双击（包括在压缩包里直接打开）就会自动连接；exe 旁边的 `ProfitHelper-sync.txt` 优先，
+   方便以后换密钥。在压缩包里直接打开时，数据保存在 `%LOCALAPPDATA%\ProfitHelper`，不会随临时文件夹丢失。
 3. 安卓端：在 `android/local.properties` 写入 `profitHelper.presetConnectionCode=PH1-…` 后打包正式版。
-4. 轮换密钥：替换 exe 旁的 `ProfitHelper-sync.txt`（安卓端安装新打包的版本），重新打开程序或点“重新检测”。
+4. 轮换密钥：替换 exe 旁的 `ProfitHelper-sync.txt`（或重新写入 exe；安卓端安装新打包的版本），重新打开程序或点“重新检测”。
 
 同步规则：
 

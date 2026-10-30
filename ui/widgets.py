@@ -117,10 +117,9 @@ def page_header(title: str, subtitle: str = "") -> tuple[QHBoxLayout, QLabel, QH
     text_col = QVBoxLayout()
     text_col.setSpacing(2)
     text_col.addWidget(label(title, "PageTitle"))
-    sub = label(subtitle, "PageSubtitle")
+    sub = label(subtitle, "PageSubtitle", wrap=True)  # 窗口较窄时换行，不撑宽页面
     text_col.addWidget(sub)
-    row.addLayout(text_col)
-    row.addStretch()
+    row.addLayout(text_col, 1)
     actions = QHBoxLayout()
     actions.setSpacing(8)
     row.addLayout(actions)
@@ -249,7 +248,9 @@ class FlowLayout(QLayout):
         effective = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
         x, y, line_height = effective.x(), effective.y(), 0
         for item in self._items:
-            if item.widget() is not None and not item.widget().isVisible() and not test_only:
+            # 只跳过被主动隐藏的控件；不能用 isVisible() 判断——窗口第一次显示、布局计算时子控件还没显示出来，
+            # 会被全部跳过而停留在默认的 640×480 大小
+            if item.isEmpty():
                 continue
             hint = item.sizeHint()
             next_x = x + hint.width() + self._h

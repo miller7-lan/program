@@ -24,6 +24,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from core.app_paths import data_file_path, resource_path
 from core.database import DatabaseManager
+from core.sync_preset import find_preset
 from core.version import APP_VERSION
 from ui.main_window import MainWindow
 from ui.sync_manager import SyncManager
@@ -40,7 +41,9 @@ def _run_smoke_test(app: QApplication, window: MainWindow) -> None:
             window._switch_page(index)
             QTimer.singleShot(400, lambda: step(index + 1))
             return
-        data_file_path("smoke-test.txt").write_text("ok\n" if not errors else "\n".join(errors), encoding="utf-8")
+        found = find_preset()
+        report = ("ok" if not errors else "\n".join(errors)) + f"\npreset={found[1] if found else 'none'}\n"
+        data_file_path("smoke-test.txt").write_text(report, encoding="utf-8")
         app.exit(1 if errors else 0)
 
     QTimer.singleShot(500, step)

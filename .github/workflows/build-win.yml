@@ -38,20 +38,34 @@ jobs:
         if ($p.ExitCode -ne 0) { throw "EXE 自检失败，退出码 $($p.ExitCode)" }
         Remove-Item dist\smoke-test.txt, dist\family_ledger.db, dist\family_ledger.lock -ErrorAction SilentlyContinue
 
+    - name: Smoke test EXE with a built-in preset (dummy key)
+      shell: pwsh
+      run: |
+        # 用假的连接码验证“写在 exe 末尾的内置连接码”能被读到、程序照常启动；真实密钥只在本机写入，不进 CI
+        python -c "from core.sync_client import make_connection_code as m; open('dummy-sync.txt', 'w').write(m('https://example.com:28443', 'PH-CI-DUMMY-KEY'))"
+        python tools/embed_preset.py dist\ProfitHelper.exe dummy-sync.txt embed-test\ProfitHelper.exe
+        $p = Start-Process -FilePath "embed-test\ProfitHelper.exe" -ArgumentList "--smoke-test" -PassThru
+        if (-not $p.WaitForExit(120000)) { Stop-Process -Id $p.Id -Force; throw "EXE 没有在 120 秒内退出" }
+        Get-Content embed-test\smoke-test.txt
+        if ($p.ExitCode -ne 0) { throw "EXE 自检失败，退出码 $($p.ExitCode)" }
+        if (-not (Select-String -Path embed-test\smoke-test.txt -Pattern "preset=embedded" -Quiet)) { throw "没有读到 exe 内置的连接码" }
+        Remove-Item -Recurse -Force embed-test, dummy-sync.txt
+
     - name: Render UI screenshots (demo data)
       run: |
         python tools/preview_screenshots.py --out screenshots --size 1280x720 --scale 1.0
         python tools/preview_screenshots.py --out screenshots --size 1100x620 --scale 1.25
+        python tools/preview_screenshots.py --out screenshots --size 960x600 --scale 1.25
 
     - name: Create Zip Archive
       run: |
-        powershell Compress-Archive -Path "dist\ProfitHelper.exe" -DestinationPath "ProfitHelper_Windows_v1.1.zip"
+        powershell Compress-Archive -Path "dist\ProfitHelper.exe" -DestinationPath "ProfitHelper_Windows.zip"
 
     - name: Upload EXE
       uses: actions/upload-artifact@v4
       with:
         name: ProfitHelper_Windows
-        path: ProfitHelper_Windows_v1.1.zip
+        path: ProfitHelper_Windows.zip
 
     - name: Upload screenshots
       uses: actions/upload-artifact@v4

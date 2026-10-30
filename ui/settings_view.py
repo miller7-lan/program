@@ -149,9 +149,10 @@ class SettingsView(QWidget):
         bar_layout.addWidget(self._save_btn)
         outer.addWidget(bar)
 
-    def _list_buttons(self, on_add, on_rename, on_delete, on_up, on_down, add_text: str) -> QHBoxLayout:
-        row = QHBoxLayout()
-        row.setSpacing(6)
+    def _list_buttons(self, on_add, on_rename, on_delete, on_up, on_down, add_text: str) -> QWidget:
+        # 流式排列：窗口较窄（例如 125% 缩放）时自动换行，不会被裁掉
+        holder = QWidget()
+        row = FlowLayout(holder, 6, 6)
         for text, variant, icon_name, handler, tip in [
             (add_text, "soft", "plus", on_add, ""),
             ("改名", "", "edit", on_rename, ""),
@@ -162,8 +163,7 @@ class SettingsView(QWidget):
             button = make_button(text, variant, icon_name, tooltip=tip)
             button.clicked.connect(handler)
             row.addWidget(button)
-        row.addStretch()
-        return row
+        return holder
 
     def _build_category_card(self) -> Card:
         card = Card()
@@ -186,7 +186,7 @@ class SettingsView(QWidget):
         self._parent_list.setMinimumHeight(230)
         self._parent_list.currentRowChanged.connect(self._on_parent_selected)
         left.addWidget(self._parent_list, 1)
-        left.addLayout(self._list_buttons(self._add_parent, self._rename_parent, self._delete_parent,
+        left.addWidget(self._list_buttons(self._add_parent, self._rename_parent, self._delete_parent,
                                           lambda: self._move_parent(-1), lambda: self._move_parent(1), "添加一级"))
         columns.addLayout(left, 1)
 
@@ -197,7 +197,7 @@ class SettingsView(QWidget):
         self._child_list = QListWidget()
         self._child_list.setMinimumHeight(230)
         right.addWidget(self._child_list, 1)
-        right.addLayout(self._list_buttons(self._add_child, self._rename_child, self._delete_child,
+        right.addWidget(self._list_buttons(self._add_child, self._rename_child, self._delete_child,
                                            lambda: self._move_child(-1), lambda: self._move_child(1), "添加二级"))
         columns.addLayout(right, 1)
         layout.addLayout(columns)
@@ -226,8 +226,8 @@ class SettingsView(QWidget):
         status_row.addWidget(self._formula_status, 1)
         layout.addLayout(status_row)
 
-        ops = QHBoxLayout()
-        ops.setSpacing(6)
+        ops_holder = QWidget()
+        ops = FlowLayout(ops_holder, 6, 6)
         for text, insert in [("+", " + "), ("−", " - "), ("×", " * "), ("÷", " / "), ("(", "("), (")", ")")]:
             button = make_button(text, "op")
             button.clicked.connect(lambda _=False, value=insert: self._formula_input.insert(value))
@@ -238,10 +238,9 @@ class SettingsView(QWidget):
         clear = make_button("清空", "ghost")
         clear.clicked.connect(self._formula_input.clear)
         ops.addWidget(clear)
-        ops.addStretch()
-        layout.addLayout(ops)
+        layout.addWidget(ops_holder)
 
-        layout.addWidget(label("点击插入分类（每个分类都有按钮，深色为一级分类的合计；新增分类后立即出现）", "Hint"))
+        layout.addWidget(label("点击插入分类（每个分类都有按钮，深色为一级分类的合计；新增分类后立即出现）", "Hint", wrap=True))
         self._token_holder = QWidget()
         self._token_layout = FlowLayout(self._token_holder, 6, 8)
         layout.addWidget(self._token_holder)

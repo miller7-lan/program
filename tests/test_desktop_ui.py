@@ -29,7 +29,7 @@ from core.sync_client import make_connection_code  # noqa: E402
 
 try:
     from PySide6.QtCore import QDate, QEvent
-    from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox, QPushButton
+    from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox, QPushButton, QScrollArea
 except ImportError:  # pragma: no cover - 没有 PySide6 的环境只跑核心测试
     QApplication = None
 
@@ -176,6 +176,26 @@ class DesktopUiTests(unittest.TestCase):
         view._formula_input.clear()
         buttons["新子项3"].click()
         self.assertEqual(view._formula_input.text(), "新子项3")
+
+    def test_category_buttons_are_laid_out_on_first_show_even_in_a_narrow_window(self):
+        from ui.settings_view import SettingsView
+        from ui.sync_manager import SyncManager
+
+        self.manager = SyncManager(self.db, "test")
+        view = SettingsView(self.db, self.manager)
+        view.resize(700, 600)  # 相当于最小窗口宽度、125% 缩放时设置页的可用宽度
+        view.show()
+        self.widgets.append(view)
+        self.pump()
+        names = ["添加一级", "添加二级", "改名", "删除"]
+        buttons = [b for b in view.findChildren(QPushButton) if b.text() in names]
+        self.assertEqual(len(buttons), 6)
+        for button in buttons:
+            holder = button.parentWidget()
+            self.assertTrue(holder.rect().contains(button.geometry()), f"「{button.text()}」没有排进按钮区域")
+            self.assertLess(button.width(), 300)
+        content = view.findChild(QScrollArea).widget()
+        self.assertLessEqual(content.minimumSizeHint().width(), view.findChild(QScrollArea).viewport().width())
 
     def test_formula_is_tidied_on_focus_out_and_tidying_alone_is_not_a_change(self):
         self.db.set_config("profit_formula", "账户+现金  -（小肠×2）")
