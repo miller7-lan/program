@@ -8,11 +8,13 @@ import android.database.sqlite.SQLiteOpenHelper
 import com.homeapp.profithelper.core.FieldConfig
 import com.homeapp.profithelper.core.FieldNode
 import com.homeapp.profithelper.core.FormulaEngine
+import com.homeapp.profithelper.core.FormulaException
 import com.homeapp.profithelper.core.RawData
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
+import kotlin.math.abs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +28,21 @@ data class DailyRecord(
     val note: String,
 )
 
+/**
+ * 按某套分类和公式重算全部记录利润的结果（只读），与桌面端 ProfitPreview 一致。
+ * changed = (日期, 原利润, 新利润)；failed = 新公式算不出来的日期（例如除以 0），保留原利润；
+ * affected = 这次修改让算出来的利润变了的天数（与修改前的分类和公式相比）。
+ */
+data class ProfitPreview(
+    val days: Int,
+    val totalBefore: Double,
+    val changed: List<Triple<String, Double, Double>>,
+    val failed: List<String>,
+    val affected: Int,
+) {
+    val totalAfter: Double get() = totalBefore + changed.sumOf { it.third - it.second }
+}
+
 /** 本机账本。表结构与同步规则和桌面端 core/database.py 保持一致（删除的记录保留墓碑以便同步）。 */
 class Ledger(private val context: Context, dbName: String = "ledger.db") {
 
@@ -34,6 +51,8 @@ class Ledger(private val context: Context, dbName: String = "ledger.db") {
         const val LEGACY_MODIFIED_AT = 1L
         /** 与同步服务器的限制一致，超出的数据无法上传。 */
         const val NOTE_MAX_CHARS = 4000
+        /** 利润相差不到半分钱视为相同（浮点误差），不算“变化”。 */
+        const val PROFIT_TOLERANCE = 0.005
         private val DATE_RE = Regex("^\\d{4}-\\d{2}-\\d{2}$")
         fun nowMs(): Long = System.currentTimeMillis()
 
@@ -287,6 +306,87 @@ class Ledger(private val context: Context, dbName: String = "ledger.db") {
         }
         if (migrated > 0 || settingsChanged) localChanged() else bumpVersion()
         return migrated
+    }
+
+    /**
+     * 设置页保存前调用：按新的分类与公式（含改名）重算每一天的利润，只读不改（与桌面端 preview_profit_changes 一致）。
+     * 已保存的利润是保存那天按当时公式算的，改公式后会和新公式不一致，由用户决定是否重算。
+     */
+    fun previewProfitChanges(
+        tree: List<FieldNode>,
+        formula: String,
+        parentRenames: Map<String, String> = emptyMap(),
+        childRenames: Map<String, Map<String, String>> = emptyMap(),
+    ): ProfitPreview = profitPreview(liveProfitRows(), tree, formula, parentRenames, childRenames, fieldTree() to profitFormula())
+
+    /**
+     * 按当前保存的分类与公式重算全部记录的利润；有变化的记录会同步到电脑，算不出来的日期保留原利润。
+     * 返回被更新的天数（与桌面端 recompute_profits 一致）。
+     */
+    fun recomputeProfits(): Int {
+        val preview: ProfitPreview
+        db.beginTransaction()
+        try {
+            preview = profitPreview(liveProfitRows(), fieldTree(), profitFormula())
+            for ((date, _, profit) in preview.changed) {
+                db.update("records", ContentValues().apply {
+                    put("total_profit", profit)
+                    put("modified_at", nextModifiedAt(date))
+                    put("dirty", 1)
+                }, "date = ?", arrayOf(date))
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+        if (preview.changed.isNotEmpty()) localChanged()
+        return preview.changed.size
+    }
+
+    private fun liveProfitRows(): List<Triple<String, Double, String>> {
+        val rows = mutableListOf<Triple<String, Double, String>>()
+        db.rawQuery("SELECT date, total_profit, raw_data FROM records WHERE deleted = 0 ORDER BY date ASC", null).use {
+            while (it.moveToNext()) rows += Triple(it.getString(0), it.getDouble(1), it.getString(2) ?: "{}")
+        }
+        return rows
+    }
+
+    private fun safeProfit(formula: String, tree: List<FieldNode>, raw: RawData): Double? = try {
+        FormulaEngine.evaluate(formula, FieldConfig.buildVariables(tree, raw)).takeIf { it.isFinite() }
+    } catch (e: FormulaException) {
+        null
+    }
+
+    /** 有改名时先按改名后的键名计算（与保存设置时一致）；current = 修改前的 (分类, 公式)，给出时同时统计 affected。 */
+    private fun profitPreview(
+        rows: List<Triple<String, Double, String>>,
+        tree: List<FieldNode>,
+        formula: String,
+        parentRenames: Map<String, String> = emptyMap(),
+        childRenames: Map<String, Map<String, String>> = emptyMap(),
+        current: Pair<List<FieldNode>, String>? = null,
+    ): ProfitPreview {
+        val renamesChildren = childRenames.filterValues { it.isNotEmpty() }
+        val renames = parentRenames.isNotEmpty() || renamesChildren.isNotEmpty()
+        var total = 0.0
+        var affected = 0
+        val changed = mutableListOf<Triple<String, Double, Double>>()
+        val failed = mutableListOf<String>()
+        for ((date, old, rawText) in rows) {
+            val stored = FieldConfig.parseRawData(rawText)
+            val raw = if (renames) FieldConfig.migrateRawData(stored, parentRenames, renamesChildren) else stored
+            total += old
+            val new = safeProfit(formula, tree, raw)
+            if (current != null) {
+                val before = safeProfit(current.second, current.first, stored)
+                if ((new == null) != (before == null) || (new != null && before != null && abs(new - before) > PROFIT_TOLERANCE)) affected++
+            }
+            when {
+                new == null -> failed += date
+                abs(new - old) > PROFIT_TOLERANCE -> changed += Triple(date, old, new)
+            }
+        }
+        return ProfitPreview(rows.size, total, changed, failed, affected)
     }
 
     /** 当前分类与公式的指纹（只整理了公式格式不算修改），用于判断编辑期间设置是否被云同步改过。 */

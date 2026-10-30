@@ -401,6 +401,21 @@ fun SettingsScreen(app: ProfitApp, settings: SettingsController) {
         )
     }
 
+    settings.recomputePending?.let { preview ->
+        AlertDialog(
+            onDismissRequest = { settings.resolveRecompute(null) },
+            title = { Text("历史利润会变化") },
+            text = { Text(recomputeMessage(preview)) },
+            confirmButton = { TextButton(onClick = { settings.resolveRecompute(true) }) { Text("重算历史") } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { settings.resolveRecompute(null) }) { Text("取消", color = Palette.Text2) }
+                    TextButton(onClick = { settings.resolveRecompute(false) }) { Text("保留原利润") }
+                }
+            },
+        )
+    }
+
     importUri?.let { uri ->
         AlertDialog(
             onDismissRequest = { importUri = null },

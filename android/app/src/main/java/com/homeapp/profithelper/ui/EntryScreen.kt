@@ -188,6 +188,16 @@ fun EntryScreen(app: ProfitApp, entry: EntryController) {
         )
     }
 
+    if (entry.futurePending) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { entry.resolveFuture(false) },
+            title = { Text("日期在今天之后") },
+            text = { Text(entry.futureMessage()) },
+            confirmButton = { TextButton(onClick = { entry.resolveFuture(true) }) { Text("仍然保存", color = Palette.Danger) } },
+            dismissButton = { TextButton(onClick = { entry.resolveFuture(false) }) { Text("取消") } },
+        )
+    }
+
     entry.pendingDate?.let {
         UnsavedChangesDialog(
             dateLabel = entry.dateTitle(),

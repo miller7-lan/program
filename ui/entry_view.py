@@ -15,7 +15,6 @@ import re
 from PySide6.QtCore import QDate, QSignalBlocker, Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QDateEdit,
     QGridLayout,
     QHBoxLayout,
     QLineEdit,
@@ -32,7 +31,7 @@ from core.event_bus import event_bus
 from core.field_config import build_formula_variables, load_field_tree_from_json, merge_entry_raw
 from core.formula_engine import FormulaEngine, FormulaError, normalize_formula
 from ui import theme
-from ui.widgets import Badge, Card, label, make_button, page_header, set_tone
+from ui.widgets import Badge, Card, DateEdit, label, make_button, page_header, set_tone
 
 _LEADING_ZEROS = re.compile(r"(?<![\d.])0+(?=\d)")
 _ENGINE = FormulaEngine()
@@ -144,7 +143,7 @@ class EntryView(QWidget):
         prev_btn.clicked.connect(lambda: self._shift_day(-1))
         bar.addWidget(prev_btn)
 
-        self._date_edit = QDateEdit(self._current_date)
+        self._date_edit = DateEdit(self._current_date)
         self._date_edit.setDisplayFormat("yyyy-MM-dd  dddd")
         self._date_edit.setCalendarPopup(True)
         self._date_edit.setMinimumWidth(190)
@@ -528,6 +527,8 @@ class EntryView(QWidget):
         if len(note_text) > NOTE_MAX_CHARS:
             QMessageBox.warning(self, "备注太长", f"备注最多 {NOTE_MAX_CHARS} 个字，当前 {len(note_text)} 个字，请精简后再保存。")
             return False
+        if not self._confirm_future_date():
+            return False
         if not self._confirm_overwrite_if_changed(date_str):
             return False
         # 保留这一天里当前分类以外的数据（例如删掉的分类、其他设备新增的分类），不因保存而丢失
@@ -541,6 +542,25 @@ class EntryView(QWidget):
             "success",
         )
         return True
+
+    def _confirm_future_date(self) -> bool:
+        """要保存的日期在今天之后（多半是选错了年份或日期）：先让用户确认。"""
+        today = QDate.currentDate()
+        if self._current_date <= today:
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("日期在今天之后")
+        box.setText(
+            f"要保存的日期是 {self._current_date.toString('yyyy年M月d日')}，"
+            f"比今天（{today.toString('yyyy年M月d日')}）晚 {today.daysTo(self._current_date)} 天。\n"
+            "请确认没有选错年份或日期。"
+        )
+        save = box.addButton("仍然保存", QMessageBox.ButtonRole.AcceptRole)
+        cancel = box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(cancel)
+        box.exec()
+        return box.clickedButton() is save
 
     def _confirm_overwrite_if_changed(self, date_str: str) -> bool:
         """打开这一天之后，若它被云同步（其他设备）改过，保存前先问，避免静默覆盖。"""

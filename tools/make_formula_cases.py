@@ -128,8 +128,29 @@ for item in merge_cases:
     item["tree"] = TREE
     item["expected"] = merge_entry_raw(item["previous"], item["collected"], TREE)
 
+# 随机生成带小数的整天账目：两端按分类树汇总、按公式计算的利润必须逐位相同（求和顺序也要一致）
+record_rng = random.Random(20261030)
+record_cases = []
+for _ in range(60):
+    record_raw = {}
+    for node in DEFAULT_FIELD_TREE:
+        if node["children"]:
+            record_raw[node["name"]] = {
+                child: round(record_rng.choice([0, 0, record_rng.uniform(0, 3000)]), record_rng.choice([0, 1, 2]))
+                for child in node["children"] if record_rng.random() < 0.85
+            }
+        else:
+            record_raw[node["name"]] = round(record_rng.uniform(0, 800), 2)
+    record_variables = build_formula_variables(DEFAULT_FIELD_TREE, record_raw)
+    record_cases.append({
+        "raw_data": record_raw,
+        "results": {formula: engine.evaluate(formula, record_variables)
+                    for formula in (DEFAULT_PROFIT_FORMULA, "营业额 - 成本", "(营业额 - 成本 + 零钱) * 0.9")},
+    })
+
 out = ROOT / "android" / "app" / "src" / "test" / "resources" / "formula_cases.json"
 out.write_text(json.dumps({"variables": variables, "cases": cases, "default_tree_case": default_case,
-                           "migrate_cases": migrate_cases, "merge_cases": merge_cases},
+                           "migrate_cases": migrate_cases, "merge_cases": merge_cases,
+                           "record_cases": record_cases},
                           ensure_ascii=False, indent=1), encoding="utf-8")
 print(f"{len(cases)} 条公式用例已写入 {out.relative_to(ROOT)}")

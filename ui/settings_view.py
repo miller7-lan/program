@@ -579,14 +579,56 @@ class SettingsView(QWidget):
             return False
 
         parent_renames, child_renames = self._renames()
+        recompute = False
+        preview = self._db.preview_profit_changes(tree, formula, parent_renames, child_renames)
+        if preview.affected and preview.changed:  # 只在这次修改真的改变了历史利润时询问
+            choice = self._ask_recompute(preview)
+            if choice is None:
+                return False
+            recompute = choice
         migrated = self._db.save_settings(tree, formula, parent_renames, child_renames)
+        recomputed = self._db.recompute_profits() if recompute else 0
         self._load_config()
         event_bus.config_changed.emit()
-        if migrated:
+        if migrated or recomputed:
             event_bus.data_changed.emit()
         extra = f"，{migrated} 天的历史记录已同步改名" if migrated else ""
+        if recomputed:
+            extra += f"，{recomputed} 天的利润已按新公式重算"
         event_bus.toast_requested.emit(f"设置已保存{extra}，会自动同步到手机", "success")
         return True
+
+    def _ask_recompute(self, preview) -> bool | None:
+        """
+        新的分类或公式会改变已保存的历史利润：让用户选择。
+        返回 True = 按新公式重算历史，False = 保留原利润（只影响以后保存的记录），None = 取消保存。
+        """
+        lines = [f"  {date}：{theme.fmt_money(old)} → {theme.fmt_money(new)}" for date, old, new in preview.changed[:3]]
+        if len(preview.changed) > 3:
+            lines.append(f"  ……共 {len(preview.changed)} 天")
+        failed = (f"\n另有 {len(preview.failed)} 天按新公式算不出来（例如出现除以 0），会保留原利润。"
+                  if preview.failed else "")
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("历史利润会变化")
+        box.setText(
+            f"按新的分类和公式计算，已保存的 {len(preview.changed)} 天利润会变化：\n" + "\n".join(lines) + "\n\n"
+            f"全部 {preview.days} 天合计：{theme.fmt_money(preview.total_before)} → {theme.fmt_money(preview.total_after)}"
+            f"{failed}\n\n"
+            "重算历史：这些天改用新公式，并同步到手机。\n"
+            "保留原利润：以前的利润不变，以后保存的记录才用新公式。"
+        )
+        recompute = box.addButton("重算历史", QMessageBox.ButtonRole.AcceptRole)
+        keep = box.addButton("保留原利润", QMessageBox.ButtonRole.NoRole)
+        box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(recompute)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is recompute:
+            return True
+        if clicked is keep:
+            return False
+        return None
 
     def _confirm_overwrite_remote(self) -> bool:
         box = QMessageBox(self)

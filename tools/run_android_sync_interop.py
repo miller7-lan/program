@@ -71,7 +71,8 @@ def main() -> int:
         expect(store.status()["record_count"] == 2, "服务器上有 2 天记录（另 1 天已删除）")
 
         print("2. 在模拟器上运行安卓端同步测试（含安卓端改名）")
-        run_android_tests(token, "notClass", f"{TEST_PACKAGE}.DesktopRenameInteropTest", "SyncInteropTest")
+        later = f"{TEST_PACKAGE}.DesktopRenameInteropTest,{TEST_PACKAGE}.DesktopRecomputeInteropTest"
+        run_android_tests(token, "notClass", later, "SyncInteropTest 与本机账本测试")
 
         print("3. 桌面端拉取并核对安卓端写回的结果")
         engine.sync()
@@ -101,6 +102,17 @@ def main() -> int:
         engine.sync()
         expect(desktop.count_pending_changes() == 0, "改名后的设置和记录都已上传")
         run_android_tests(token, "class", f"{TEST_PACKAGE}.DesktopRenameInteropTest", "DesktopRenameInteropTest")
+
+        print("5. 桌面端改公式（去掉“+ 备用金”）并选择“重算历史”，同步到安卓端")
+        preview = desktop.preview_profit_changes(tree, format_formula("现金+微信收款-进货款"))
+        expect(preview.affected >= 1 and preview.changed, f"保存前预览：{len(preview.changed)} 天利润会变化")
+        desktop.save_settings(tree, format_formula("现金+微信收款-进货款"))
+        recomputed = desktop.recompute_profits()
+        expect(recomputed == len(preview.changed) and desktop.get_record("2026-09-01")["total_profit"] == 1050.25,
+               f"桌面端按新公式重算了 {recomputed} 天（2026-09-01：1070.25 → 1050.25）")
+        engine.sync()
+        expect(desktop.count_pending_changes() == 0, "重算后的记录都已上传")
+        run_android_tests(token, "class", f"{TEST_PACKAGE}.DesktopRecomputeInteropTest", "DesktopRecomputeInteropTest")
         print("全部通过")
         return 0
     finally:

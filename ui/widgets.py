@@ -11,6 +11,7 @@ from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, Si
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QDateEdit,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -34,6 +35,20 @@ class Card(QFrame):
     def __init__(self, parent=None, object_name: str = "Card"):
         super().__init__(parent)
         self.setObjectName(object_name)
+
+
+class DateEdit(QDateEdit):
+    """
+    不响应鼠标滚轮的日期框。QDateEdit 默认滚一格就改一次“年份”，滚动页面时鼠标经过就可能把
+    2026 滚成 2033 且毫无察觉；改日期请用日历、键盘或前一天 / 后一天按钮。
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # 滚轮也不会让它获得焦点
+
+    def wheelEvent(self, event) -> None:  # noqa: N802 - Qt API
+        event.ignore()  # 交给外层（例如滚动区域）处理
 
 
 def make_button(text: str, variant: str = "", icon_name: str | None = None, icon_color: str | None = None,

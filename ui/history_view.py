@@ -18,7 +18,6 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
-    QDateEdit,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
@@ -35,7 +34,7 @@ from core.event_bus import event_bus
 from core.field_config import build_formula_variables
 from core.report_engine import ReportEngine, load_field_tree, weekday_label
 from ui import icons, theme
-from ui.widgets import Card, label, make_button, page_header, set_tone
+from ui.widgets import Card, DateEdit, label, make_button, page_header, set_tone
 
 
 class ExportWorker(QThread):
@@ -121,14 +120,14 @@ class HistoryView(QWidget):
         row = QHBoxLayout()
         row.setSpacing(8)
         row.addWidget(label("日期范围", "Hint"))
-        self._start_date = QDateEdit()
+        self._start_date = DateEdit()
         self._start_date.setDisplayFormat("yyyy-MM-dd")
         self._start_date.setCalendarPopup(True)
         self._start_date.setMinimumWidth(140)
         self._start_date.dateChanged.connect(self._on_custom_range)
         row.addWidget(self._start_date)
         row.addWidget(label("至", "Hint"))
-        self._end_date = QDateEdit()
+        self._end_date = DateEdit()
         self._end_date.setDisplayFormat("yyyy-MM-dd")
         self._end_date.setCalendarPopup(True)
         self._end_date.setMinimumWidth(140)

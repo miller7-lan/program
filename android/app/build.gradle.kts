@@ -26,8 +26,8 @@ android {
         applicationId = "com.homeapp.profithelper"
         minSdk = 26
         targetSdk = 36
-        versionCode = 112
-        versionName = "1.1.2"
+        versionCode = 113
+        versionName = "1.1.3"
         buildConfigField("String", "DEFAULT_SERVER_URL", "\"${localProp("profitHelper.defaultServerUrl")}\"")
         buildConfigField("String", "DEFAULT_FALLBACK_IP", "\"${localProp("profitHelper.defaultFallbackIp")}\"")
         // 内置连接码只放进正式版（见 release）；调试版和测试永远不会自动连上真实账本

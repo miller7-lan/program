@@ -32,11 +32,20 @@ import sqlite3
 import threading
 import time
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from core.app_paths import data_file_path
-from core.field_config import DEFAULT_FIELD_TREE, DEFAULT_PROFIT_FORMULA, flatten_formula_fields, migrate_raw_data
+from core.field_config import (
+    DEFAULT_FIELD_TREE,
+    DEFAULT_PROFIT_FORMULA,
+    build_formula_variables,
+    flatten_formula_fields,
+    load_field_tree_from_json,
+    migrate_raw_data,
+)
+from core.formula_engine import FormulaEngine, FormulaError
 
 
 # 默认数据库文件路径：可执行文件同级目录，跨平台兼容
@@ -105,6 +114,62 @@ def sanitize_raw_data(raw_data: Any) -> dict[str, Any]:
         else:
             cleaned[name] = _clean_number(value)
     return cleaned
+
+
+# 利润相差不到半分钱视为相同（浮点误差），不算“变化”
+PROFIT_TOLERANCE = 0.005
+
+
+@dataclass
+class ProfitPreview:
+    """按某套分类与公式重算全部记录利润的结果（只读，不改数据库）。"""
+
+    days: int = 0                 # 参与计算的记录天数
+    total_before: float = 0.0     # 目前保存的利润合计
+    changed: list[tuple[str, float, float]] = field(default_factory=list)  # (日期, 原利润, 新利润)
+    failed: list[str] = field(default_factory=list)  # 新公式算不出来的日期（例如除以 0），保留原利润
+    affected: int = 0             # 这次修改让算出来的利润变了的天数（与修改前的分类和公式相比）
+
+    @property
+    def total_after(self) -> float:
+        return self.total_before + sum(new - old for _, old, new in self.changed)
+
+
+def _safe_profit(engine: FormulaEngine, formula: str, field_tree: list[dict], raw: dict) -> float | None:
+    try:
+        value = engine.evaluate(formula, build_formula_variables(field_tree, raw))
+    except FormulaError:
+        return None
+    return value if value == value and abs(value) != float("inf") else None
+
+
+def _profit_preview(rows, field_tree: list[dict], formula: str,
+                    parent_renames: dict[str, str] | None = None,
+                    child_renames: dict[str, dict[str, str]] | None = None,
+                    current: tuple[list[dict], str] | None = None) -> ProfitPreview:
+    """
+    rows 需要 date / total_profit / raw_data 三列；有改名时先按改名后的键名计算（与保存设置时一致）。
+    current = 修改前的 (分类, 公式)：给出时同时统计 affected。
+    """
+    engine = FormulaEngine()
+    preview = ProfitPreview()
+    for row in rows:
+        stored_raw = _json_dict(row["raw_data"])
+        raw = migrate_raw_data(stored_raw, parent_renames or {}, child_renames or {}) \
+            if parent_renames or child_renames else stored_raw
+        old = _clean_number(row["total_profit"])
+        preview.days += 1
+        preview.total_before += old
+        new = _safe_profit(engine, formula, field_tree, raw)
+        if current is not None:
+            before = _safe_profit(engine, current[1], current[0], stored_raw)
+            if (new is None) != (before is None) or (new is not None and abs(new - before) > PROFIT_TOLERANCE):
+                preview.affected += 1
+        if new is None:
+            preview.failed.append(row["date"])
+        elif abs(new - old) > PROFIT_TOLERANCE:
+            preview.changed.append((row["date"], old, new))
+    return preview
 
 
 class DatabaseManager:
@@ -479,9 +544,49 @@ class DatabaseManager:
             self._notify_local_change()
         return migrated
 
+    def preview_profit_changes(
+        self,
+        field_tree: list[dict],
+        formula: str,
+        parent_renames: dict[str, str] | None = None,
+        child_renames: dict[str, dict[str, str]] | None = None,
+    ) -> ProfitPreview:
+        """
+        设置页保存前调用：按新的分类与公式（含改名）重算每一天的利润，只读不改。
+        已保存的利润是保存那天按当时公式算的，改公式后会和新公式不一致，由用户决定是否重算。
+        """
+        current = self._profit_settings()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT date, total_profit, raw_data FROM DailyRecords ORDER BY date ASC"
+            ).fetchall()
+        return _profit_preview(rows, field_tree, formula, parent_renames, child_renames, current)
+
+    def _profit_settings(self) -> tuple[list[dict], str]:
+        """当前保存的 (分类树, 公式)，读法与录入页相同。"""
+        tree = load_field_tree_from_json(
+            self.get_config("custom_field_tree", "") or self.get_config("custom_fields", '["营业额", "成本"]')
+        )
+        return tree, self.get_config("profit_formula", "营业额 - 成本")
+
+    def recompute_profits(self) -> int:
+        """
+        按当前保存的分类与公式重算全部记录的利润；有变化的记录会同步到其他设备，
+        算不出来的日期（例如除以 0）保留原利润。返回被更新的天数。
+        """
+        tree, formula = self._profit_settings()
+        with self._lock, self._conn:
+            rows = self._conn.execute("SELECT date, total_profit, raw_data FROM DailyRecords").fetchall()
+            preview = _profit_preview(rows, tree, formula)
+            for date, _old, new in preview.changed:
+                self._conn.execute("UPDATE DailyRecords SET total_profit = ? WHERE date = ?", (new, date))
+                self._mark_record_dirty(date, deleted=False)
+        if preview.changed:
+            self._notify_local_change()
+        return len(preview.changed)
+
     def settings_signature(self) -> str:
         """当前分类与公式的指纹，用于判断编辑期间设置是否被云同步改过。"""
-        from core.field_config import load_field_tree_from_json
         from core.formula_engine import format_formula
 
         tree = load_field_tree_from_json(self.get_config("custom_field_tree", "") or self.get_config("custom_fields", ""))

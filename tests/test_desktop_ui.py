@@ -28,8 +28,9 @@ from core.event_bus import event_bus  # noqa: E402
 from core.sync_client import make_connection_code  # noqa: E402
 
 try:
-    from PySide6.QtCore import QDate, QEvent
-    from PySide6.QtWidgets import QApplication, QInputDialog, QMessageBox, QPushButton, QScrollArea
+    from PySide6.QtCore import QDate, QEvent, QPoint, QPointF, Qt
+    from PySide6.QtGui import QWheelEvent
+    from PySide6.QtWidgets import QApplication, QDateEdit, QInputDialog, QMessageBox, QPushButton, QScrollArea
 except ImportError:  # pragma: no cover - 没有 PySide6 的环境只跑核心测试
     QApplication = None
 
@@ -376,6 +377,80 @@ class DesktopUiTests(unittest.TestCase):
         self.assertEqual(view._field_inputs["营业额::现金"].text(), "88")
         self.assertEqual(view._note_input.toPlainText(), "还没保存")
         self.assertTrue(view.has_unsaved_changes())
+
+
+    # ── 历史利润与日期防误操作 ────────────────
+
+    def test_formula_change_asks_whether_to_recompute_saved_profits(self):
+        date = "2026-10-01"
+        self.db.upsert_record(date, 6.0, {"营业额": {"账户": 5.0, "邮政账户": 2.0}, "成本": {"小肠": 1.0}, "零钱": 4.0}, "")
+        view = self.settings_view()
+        formula = view._formula_input.text()
+        view._formula_input.setText(formula + " + 零钱")
+
+        with FakeDialogs(choice=None) as dialogs:  # 关掉对话框 = 取消保存
+            self.assertFalse(view._on_save())
+        self.assertIn("1 天利润会变化", dialogs.boxes[0][1])
+        self.assertIn("¥6.00 → ¥10.00", dialogs.boxes[0][1])
+        self.assertTrue(view.is_dirty())
+
+        with FakeDialogs(choice="保留原利润"):
+            self.assertTrue(view._on_save())
+        self.assertEqual(self.db.get_record(date)["total_profit"], 6.0)
+
+        with FakeDialogs(names=["备用金"]):  # 之后的修改不影响利润：不再询问
+            view._add_parent()
+        with FakeDialogs() as dialogs:
+            self.assertTrue(view._on_save())
+        self.assertEqual(dialogs.boxes, [])
+
+        view._formula_input.setText(formula + " + 零钱 * 2")
+        with FakeDialogs(choice="重算历史"):
+            self.assertTrue(view._on_save())
+        self.assertEqual(self.db.get_record(date)["total_profit"], 14.0)
+        self.assertIn(date, [r["date"] for r in self.db.collect_dirty_records(5)])  # 会同步到手机
+
+    def test_saving_a_future_date_asks_first(self):
+        view = self.entry_view()
+        future = QDate.currentDate().addYears(7)
+        view._request_date(future)
+        view._field_inputs["营业额::现金"].setText("5")
+        with FakeDialogs(choice="取消") as dialogs:
+            self.assertFalse(view._on_save())
+        self.assertIn("请确认没有选错年份或日期", dialogs.boxes[0][1])
+        self.assertIsNone(self.db.get_record(future.toString("yyyy-MM-dd")))
+        with FakeDialogs(choice="仍然保存"):
+            self.assertTrue(view._on_save())
+        self.assertIsNotNone(self.db.get_record(future.toString("yyyy-MM-dd")))
+
+        today = QDate.currentDate()
+        view._request_date(today)
+        view._field_inputs["营业额::现金"].setText("6")
+        with FakeDialogs() as dialogs:  # 今天和以前的日期直接保存
+            self.assertTrue(view._on_save())
+        self.assertEqual(dialogs.boxes, [])
+
+    def test_mouse_wheel_cannot_change_the_entry_date(self):
+        def wheel(widget, notches: int) -> None:
+            local = QPointF(widget.width() / 2, widget.height() / 2)
+            event = QWheelEvent(local, QPointF(widget.mapToGlobal(local.toPoint())), QPoint(0, 0), QPoint(0, 120 * notches),
+                                Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False)
+            QApplication.sendEvent(widget, event)
+            self.pump()
+
+        plain = QDateEdit(QDate(2026, 9, 6))  # 对照：普通日期框滚 7 格就从 2026 变成 2033
+        plain.setDisplayFormat("yyyy-MM-dd")
+        plain.show()
+        self.widgets.append(plain)
+        self.pump()
+        wheel(plain, 7)
+        self.assertEqual(plain.date().year(), 2033)
+
+        view = self.entry_view()
+        before = view._date_edit.date()
+        wheel(view._date_edit, 7)
+        self.assertEqual(view._date_edit.date(), before)
+        self.assertEqual(view._current_date, before)
 
 
 if __name__ == "__main__":

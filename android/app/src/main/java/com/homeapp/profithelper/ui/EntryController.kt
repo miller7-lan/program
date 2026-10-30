@@ -15,6 +15,7 @@ import com.homeapp.profithelper.data.Ledger
 import com.homeapp.profithelper.data.fmtAmountInput
 import com.homeapp.profithelper.data.fmtMoney
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 private val LEADING_ZEROS = Regex("(?<![\\d.])0+(?=\\d)")
 private val PLAIN_NUMBER = Regex("-?\\d+(\\.\\d+)?")
@@ -45,6 +46,10 @@ class EntryController(private val ledger: Ledger) {
     /** 保存时发现这一天在编辑期间已被云同步更新，等待用户决定是否覆盖。 */
     var conflictPending by mutableStateOf(false)
         private set
+    /** 要保存的日期在今天之后（多半选错了年份或日期），等待用户确认。 */
+    var futurePending by mutableStateOf(false)
+        private set
+    private var afterFutureSave: LocalDate? = null
     val values = mutableStateMapOf<String, String>()
     private var loadedRecord: DailyRecord? = null
 
@@ -113,7 +118,7 @@ class EntryController(private val ledger: Ledger) {
         val target = pendingDate ?: return
         pendingDate = null
         when (save) {
-            true -> if (saveAndReport()) load(target)
+            true -> if (saveAndReport()) load(target) else if (futurePending) afterFutureSave = target
             false -> load(target)
             null -> Unit
         }
@@ -185,7 +190,8 @@ class EntryController(private val ledger: Ledger) {
         values[key] = fmtAmountInput(value).ifEmpty { "0" }
     }
 
-    fun saveAndReport(force: Boolean = false): Boolean {
+    /** force：已确认覆盖同步冲突（此前也已确认过日期）；futureConfirmed：已确认保存到今天之后的日期。 */
+    fun saveAndReport(force: Boolean = false, futureConfirmed: Boolean = false): Boolean {
         firstInvalidKey()?.let {
             UiEvents.alert(
                 "金额格式错误",
@@ -203,6 +209,10 @@ class EntryController(private val ledger: Ledger) {
             UiEvents.alert("公式格式错误", "利润公式无法计算：$error\n\n请到“设置 → 利润公式”中修改。")
             return false
         }
+        if (!force && !futureConfirmed && date.isAfter(LocalDate.now())) {
+            futurePending = true
+            return false
+        }
         // 打开这一天之后它被云同步（其他设备）改过：先让用户确认，避免静默覆盖
         if (!force && ledger.getRecord(date.format(ISO)) != loadedRecord) {
             conflictPending = true
@@ -218,6 +228,21 @@ class EntryController(private val ledger: Ledger) {
     }
 
     fun discard() = load(date)
+
+    fun futureMessage(): String {
+        val today = LocalDate.now()
+        return "要保存的日期是 ${date.year}年${date.monthValue}月${date.dayOfMonth}日，" +
+            "比今天（${today.year}年${today.monthValue}月${today.dayOfMonth}日）晚 ${ChronoUnit.DAYS.between(today, date)} 天。\n" +
+            "请确认没有选错年份或日期。"
+    }
+
+    /** confirm：true = 仍然保存（之后继续切换到原本要去的日期），false = 取消（继续编辑）。 */
+    fun resolveFuture(confirm: Boolean) {
+        futurePending = false
+        val next = afterFutureSave
+        afterFutureSave = null
+        if (confirm && saveAndReport(futureConfirmed = true) && next != null) load(next)
+    }
 
     /** choice：true = 仍然保存，false = 载入最新数据，null = 取消（继续编辑）。 */
     fun resolveConflict(choice: Boolean?) {

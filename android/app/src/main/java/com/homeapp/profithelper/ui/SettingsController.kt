@@ -9,6 +9,8 @@ import com.homeapp.profithelper.core.FieldConfig
 import com.homeapp.profithelper.core.FieldNode
 import com.homeapp.profithelper.core.FormulaEngine
 import com.homeapp.profithelper.data.Ledger
+import com.homeapp.profithelper.data.ProfitPreview
+import com.homeapp.profithelper.data.fmtMoney
 import java.text.Normalizer
 
 /** 编辑中的一级分类：orig / childOrig 记录载入时的原名（新增的为 null），保存时据此把改名同步到历史记录。 */
@@ -25,6 +27,16 @@ fun formulaProblem(formula: String, tree: List<FieldNode>): Pair<Tone, String> {
     return Tone.SUCCESS to "公式有效，引用了 ${used.size} 个分类"
 }
 
+/** “历史利润会变化”对话框的说明文字，与桌面端设置页一致。 */
+fun recomputeMessage(preview: ProfitPreview): String = buildString {
+    append("按新的分类和公式计算，已保存的 ${preview.changed.size} 天利润会变化：\n")
+    preview.changed.take(3).forEach { (date, old, new) -> append("  $date：${fmtMoney(old)} → ${fmtMoney(new)}\n") }
+    if (preview.changed.size > 3) append("  ……共 ${preview.changed.size} 天\n")
+    append("\n全部 ${preview.days} 天合计：${fmtMoney(preview.totalBefore)} → ${fmtMoney(preview.totalAfter)}")
+    if (preview.failed.isNotEmpty()) append("\n另有 ${preview.failed.size} 天按新公式算不出来（例如出现除以 0），会保留原利润。")
+    append("\n\n重算历史：这些天改用新公式，并同步到电脑。\n保留原利润：以前的利润不变，以后保存的记录才用新公式。")
+}
+
 /**
  * 设置页状态：放在界面之外（与录入页 EntryController 相同的做法），切换底部标签不会丢失编辑内容，
  * 离开设置页时也能询问是否保存。
@@ -36,6 +48,10 @@ class SettingsController(private val ledger: Ledger) {
     /** 保存时发现分类或公式在编辑期间已被云同步更新，等待用户决定。 */
     var conflictPending by mutableStateOf(false)
         private set
+    /** 这次修改会改变已保存的历史利润，等待用户选择：重算历史 / 保留原利润 / 取消。 */
+    var recomputePending by mutableStateOf<ProfitPreview?>(null)
+        private set
+    private var recomputeForce = false
     private var savedSignature by mutableStateOf("")
     private var loadedVersion = -1L
 
@@ -59,6 +75,7 @@ class SettingsController(private val ledger: Ledger) {
         savedSignature = ledger.settingsSignature()
         loadedVersion = ledger.version.value
         conflictPending = false
+        recomputePending = null
     }
 
     /** 数据或设置变化（含云同步）后重新读取；有未保存的修改时保留，保存时再提示。 */
@@ -166,7 +183,8 @@ class SettingsController(private val ledger: Ledger) {
 
     // ── 保存 ────────────────────────────────
 
-    fun save(force: Boolean = false): Boolean {
+    /** recompute：null = 还没问过（会改变历史利润时先询问），true = 重算历史，false = 保留原利润。 */
+    fun save(force: Boolean = false, recompute: Boolean? = null): Boolean {
         val normalized = plainTree
         if (normalized.isEmpty()) {
             UiEvents.alert("分类不能为空", "请至少添加一个一级分类。")
@@ -184,11 +202,28 @@ class SettingsController(private val ledger: Ledger) {
         }
         conflictPending = false
         val (parentRenames, childRenames) = renames()
+        if (recompute == null) {
+            val preview = ledger.previewProfitChanges(normalized, clean, parentRenames, childRenames)
+            if (preview.affected > 0 && preview.changed.isNotEmpty()) {  // 只在这次修改真的改变了历史利润时询问
+                recomputeForce = force
+                recomputePending = preview
+                return false
+            }
+        }
+        recomputePending = null
         val migrated = ledger.saveSettings(normalized, clean, parentRenames, childRenames)
+        val recomputed = if (recompute == true) ledger.recomputeProfits() else 0
         load()
-        val extra = if (migrated > 0) "，$migrated 天的历史记录已同步改名" else ""
+        var extra = if (migrated > 0) "，$migrated 天的历史记录已同步改名" else ""
+        if (recomputed > 0) extra += "，$recomputed 天的利润已按新公式重算"
         UiEvents.show("设置已保存$extra，会自动同步到电脑")
         return true
+    }
+
+    /** choice：true = 重算历史，false = 保留原利润，null = 取消（继续编辑）。 */
+    fun resolveRecompute(choice: Boolean?) {
+        recomputePending = null
+        if (choice != null) save(force = recomputeForce, recompute = choice)
     }
 
     /** choice：true = 仍然保存，false = 载入最新设置，null = 取消（继续编辑）。 */

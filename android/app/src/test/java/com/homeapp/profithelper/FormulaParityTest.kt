@@ -136,6 +136,20 @@ class FormulaParityTest {
     }
 
     @Test
+    fun wholeDayProfitsMatchDesktopBitForBit() {
+        val cases = data.getJSONArray("record_cases")
+        assertTrue(cases.length() >= 50)
+        for (index in 0 until cases.length()) {
+            val case = cases.getJSONObject(index)
+            val variables = FieldConfig.buildVariables(FieldConfig.DEFAULT_TREE, rawOf(case.getJSONObject("raw_data")))
+            val results = case.getJSONObject("results")
+            for (formula in results.keys()) {
+                assertEquals("整天账目 #$index $formula", results.getDouble(formula), FormulaEngine.evaluate(formula, variables), 0.0)
+            }
+        }
+    }
+
+    @Test
     fun nameRulesMatchDesktop() {
         val existing = setOf("营业额", "现金")
         assertEquals("", FieldConfig.nameProblem("微信_2", existing))
