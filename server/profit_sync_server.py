@@ -975,10 +975,18 @@ a{{color:#5b4fe0}}
 """
 
 
+HIDDEN_404 = (b"<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n"
+              b"<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n")
+
+
 class SyncRequestHandler(BaseHTTPRequestHandler):
     server: SyncHTTPServer
     protocol_version = "HTTP/1.1"
-    server_version = "ProfitHelperSync/" + SERVER_VERSION
+    # 对外不暴露服务名和版本：被扫描时看起来只是一个普通 HTTPS 端口（2026-11-24）。
+    server_version = "nginx"
+
+    def version_string(self):  # 父类会拼成 "nginx " 带空格
+        return "nginx"
     sys_version = ""
 
     def log_message(self, format, *args):  # noqa: A002 - 覆盖父类签名
@@ -999,9 +1007,13 @@ class SyncRequestHandler(BaseHTTPRequestHandler):
         self._body_read = method != "POST"
         path = urlsplit(self.path).path
         try:
-            if method == "GET" and path in ("/", "/index.html"):
-                self._send_html(200, self._status_page())
+            # 客户端（桌面端、安卓端）每个请求都带 Authorization；不带的一律当作不存在，
+            # 首页、ping、下载页也不再对外展示（2026-11-24，降低代理 IP 被识别的风险）。
+            if not self.headers.get("Authorization") or path in ("/", "/index.html") \
+                    or path == "/download" or path.startswith("/download/"):
+                self._send_hidden_404()
             elif method == "GET" and path == "/api/v1/ping":
+                self._require_auth()
                 self._send_json(200, {
                     "ok": True,
                     "service": SERVICE_NAME,
@@ -1019,7 +1031,7 @@ class SyncRequestHandler(BaseHTTPRequestHandler):
             elif method == "GET" and (path == "/download" or path.startswith("/download/")):
                 self._serve_download(path)
             else:
-                raise ApiError(404, "not_found", "接口不存在")
+                self._send_hidden_404()
         except ApiError as exc:
             if not self._body_read:
                 self.close_connection = True  # 未读取的请求体会污染长连接上的下一个请求
@@ -1098,6 +1110,11 @@ class SyncRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
         self._status_sent = status
         self._bytes_sent = len(body)
+
+    def _send_hidden_404(self) -> None:
+        if not self._body_read:
+            self.close_connection = True
+        self._send_bytes(404, HIDDEN_404, "text/html", compressible=False)
 
     def _send_json(self, status: int, payload: dict) -> None:
         self._send_bytes(status, json.dumps(payload, ensure_ascii=False).encode("utf-8"),

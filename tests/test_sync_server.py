@@ -135,20 +135,26 @@ class SyncServerTests(unittest.TestCase):
 
     # ── 基础 ────────────────────────────────
 
-    def test_ping_and_status_page_without_auth(self):
-        status, payload, _ = self.a.request("GET", "/api/v1/ping", auth=False)
+    def test_hidden_without_auth(self):
+        # 不带密钥的请求一律是普通 nginx 404，不暴露服务名（服务器同时跑代理，降低被识别的风险）
+        for path in ("/", "/index.html", "/api/v1/ping", "/api/v1/status", "/download/", "/robots.txt"):
+            status, page, resp = self.a.request("GET", path, auth=False)
+            self.assertEqual(status, 404, path)
+            self.assertEqual(resp.getheader("Server"), "nginx")
+            self.assertIn("nginx", page)
+            self.assertNotIn("利润", page)
+        # 带密钥：ping 正常，首页仍不展示
+        status, payload, _ = self.a.request("GET", "/api/v1/ping")
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
-        status, page, _ = self.a.request("GET", "/", auth=False)
-        self.assertEqual(status, 200)
-        self.assertIn("利润助手同步服务", page)
+        self.assertEqual(self.a.request("GET", "/")[0], 404)
 
     def test_auth_required_and_rate_limited(self):
-        # 缺少密钥也计入失败次数
+        # 缺少密钥：当作不存在（404），不计入失败次数
         status, payload, _ = self.a.request("GET", "/api/v1/status", auth=False)
-        self.assertEqual(status, 401)
+        self.assertEqual(status, 404)
         wrong = Client(self.port, "device-cccccccc", token="PH-WRONG")
-        for _ in range(pss.AUTH_FAIL_LIMIT - 1):
+        for _ in range(pss.AUTH_FAIL_LIMIT):
             self.assertEqual(wrong.request("GET", "/api/v1/status")[0], 401)
         # 达到上限后，即使密钥正确也会被暂时拒绝
         self.assertEqual(self.a.request("GET", "/api/v1/status")[0], 429)
@@ -330,7 +336,7 @@ class SyncServerTests(unittest.TestCase):
         conn.request("POST", "/api/v1/sync", body=b'{"x": 1}', headers={"Content-Type": "application/json"})
         resp = conn.getresponse()
         resp.read()
-        self.assertEqual(resp.status, 401)
+        self.assertEqual(resp.status, 404)
         conn.close()
 
     # ── 备份 / 导出 ─────────────────────────
@@ -389,7 +395,7 @@ class TlsTests(unittest.TestCase):
                     plain.request("GET", "/api/v1/ping")
                     plain.getresponse()
                 plain.close()
-                self.assertEqual(client.request("GET", "/api/v1/ping", auth=False)[0], 200)
+                self.assertEqual(client.request("GET", "/api/v1/ping")[0], 200)
             finally:
                 httpd.shutdown()
                 httpd.server_close()

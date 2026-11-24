@@ -7,7 +7,7 @@
 | 路径 | 内容 |
 | --- | --- |
 | `/opt/profit-helper/profit_sync_server.py` | 程序（`.prev` 为上一版，用于回滚） |
-| `/opt/profit-helper/downloads/` | 可选：放安装包后可在 `https://<域名>:<端口>/download/` 下载 |
+| `/opt/profit-helper/downloads/` | 已停用：下载页和首页不再对外提供（见下方「对外隐藏」） |
 | `/etc/profit-helper/config.json` | 配置（只保存同步密钥的 SHA-256，不保存明文） |
 | `/var/lib/profit-helper/ledger.db` | 账本数据库 |
 | `/var/lib/profit-helper/backups/` | 每日自动备份（保留 30 份） |
@@ -59,3 +59,7 @@ systemctl disable --now profit-helper.service profit-helper-reload.timer
 rm /etc/systemd/system/profit-helper*.service /etc/systemd/system/profit-helper-reload.timer && systemctl daemon-reload
 ufw delete allow <端口>/tcp
 ```
+
+## 对外隐藏
+
+服务器同时运行代理，为降低被识别的风险：不带 `Authorization` 的请求（包括首页、`/api/v1/ping`、下载页）一律返回普通 nginx 样式的 404，响应头 `Server: nginx`；带错误密钥仍返回 401「同步密钥不正确」。桌面端和安卓端每个请求都带密钥，不受影响。
